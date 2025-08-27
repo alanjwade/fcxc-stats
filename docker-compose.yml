@@ -1,0 +1,81 @@
+
+services:
+  db:
+    image: postgres:15
+    container_name: fcxc_db
+    environment:
+      POSTGRES_DB: fcxc_stats
+      POSTGRES_USER: fcxc_user
+      POSTGRES_PASSWORD: fcxc_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - fcxc_network
+
+  webapp:
+    build:
+      context: ./webapp
+      dockerfile: Dockerfile
+    container_name: fcxc_webapp
+    environment:
+      DATABASE_URL: postgresql://fcxc_user:fcxc_password@db:5432/fcxc_stats
+      FLASK_ENV: production
+    depends_on:
+      - db
+    volumes:
+      - ./config:/app/config
+    networks:
+      - fcxc_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: fcxc_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    depends_on:
+      - webapp
+    networks:
+      - fcxc_network
+
+  certbot:
+    image: certbot/certbot
+    container_name: fcxc_certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    networks:
+      - fcxc_network
+    profiles:
+      - certbot
+
+  scraper:
+    build:
+      context: ./scraper
+      dockerfile: Dockerfile
+    container_name: fcxc_scraper
+    environment:
+      DATABASE_URL: postgresql://fcxc_user:fcxc_password@db:5432/fcxc_stats
+    depends_on:
+      - db
+    volumes:
+      - ./config:/app/config
+    networks:
+      - fcxc_network
+    profiles:
+      - scraper
+
+volumes:
+  postgres_data:
+
+networks:
+  fcxc_network:
+    driver: bridge

@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Fort Collins High School - Cross Country Stats{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="display-4">
+            <i class="fas fa-running text-fchs-gold"></i> 
+            <span class="text-fchs-purple">Fort Collins High School</span>
+            <small class="text-fchs-purple d-block">Cross Country Statistics</small>
+        </h1>
+        <p class="lead text-fchs-purple">Track our Lambkin runners' performance across multiple seasons</p>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-5">
+    <div class="col-md-3">
+        <div class="card stats-card bg-fchs-purple text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Athletes</h5>
+                        <h2 class="card-text">{{ stats.total_athletes or 0 }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-user-friends fa-2x text-fchs-gold"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card stats-card bg-fchs-purple text-fchs-gold">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Meets</h5>
+                        <h2 class="card-text">{{ stats.total_meets or 0 }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-trophy fa-2x text-fchs-gold"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card stats-card bg-white border-fchs-gold text-fchs-purple">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Races</h5>
+                        <h2 class="card-text">{{ stats.total_races or 0 }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-flag-checkered fa-2x text-fchs-gold"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card stats-card bg-fchs-purple text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Results</h5>
+                        <h2 class="card-text">{{ stats.total_results or 0 }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-stopwatch fa-2x text-fchs-gold"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-5">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-download fa-3x text-fchs-purple mb-3"></i>
+                <h5 class="card-title text-fchs-purple">Export Data</h5>
+                <p class="card-text">Download a CSV with athlete performance data across all events.</p>
+                <a href="{{ url_for('export_csv') }}" class="btn btn-fchs-primary">
+                    <i class="fas fa-download"></i> Download CSV
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-users fa-3x text-fchs-gold mb-3"></i>
+                <h5 class="card-title text-fchs-purple">Team Statistics</h5>
+                <p class="card-text">View team performance with best times organized by gender.</p>
+                <a href="{{ url_for('team_stats') }}" class="btn btn-fchs-secondary">
+                    <i class="fas fa-chart-bar"></i> View Stats
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-user-friends fa-3x text-fchs-purple mb-3"></i>
+                <h5 class="card-title text-fchs-purple">Athlete Profiles</h5>
+                <p class="card-text">Browse individual athlete statistics and performance progression.</p>
+                <a href="{{ url_for('athletes_list') }}" class="btn btn-fchs-primary">
+                    <i class="fas fa-list"></i> Browse Athletes
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Meets -->
+{% if recent_meets %}
+<div class="row">
+    <div class="col-12">
+        <h3><i class="fas fa-calendar-alt"></i> Recent Meets</h3>
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Meet Name</th>
+                                <th>Date</th>
+                                <th>Venue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for meet in recent_meets %}
+                            <tr>
+                                <td>{{ meet.name }}</td>
+                                <td>{{ meet.meet_date }}</td>
+                                <td>{{ meet.venue_name or 'N/A' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

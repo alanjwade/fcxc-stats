@@ -1,0 +1,17 @@
+# Test configuration for single race
+races:
+  - name: "Rocky Mountain Lobo Invitational 2025 - Varsity Boys"
+    file: "pages/Rocky Mountain Lobo Invitational 2025 - Varsity Boys (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Rocky Mountain High School, Fort Collins CO"
+    date: "2025-08-23"
+    season: "2025"
+
+team:
+  name: "Fort Collins High School"
+  abbreviation: "FCHS"
+  colors:
+    primary: "#FF0000"
+    secondary: "#FFFFFF"

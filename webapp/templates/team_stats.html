@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Team Statistics - Cross Country Stats{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1><i class="fas fa-users text-primary"></i> Team Statistics</h1>
+        <p class="lead">Best times by gender and distance</p>
+    </div>
+</div>
+
+<!-- Boys Statistics -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h2><i class="fas fa-male text-primary"></i> Boys Best Times</h2>
+        {% if boys_by_distance %}
+            {% for distance, athletes in boys_by_distance.items() %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-route"></i> {{ distance }}</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Name</th>
+                                    <th>Best Time</th>
+                                    <th>Meet</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for athlete in athletes[:10] %}
+                                <tr>
+                                    <td>
+                                        {% if loop.index == 1 %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="fas fa-crown"></i> {{ loop.index }}
+                                            </span>
+                                        {% elif loop.index <= 3 %}
+                                            <span class="badge bg-secondary">{{ loop.index }}</span>
+                                        {% else %}
+                                            {{ loop.index }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ athlete.first_name }} {{ athlete.last_name }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="time-display text-primary">
+                                            {{ format_time(athlete.best_time) }}
+                                        </span>
+                                    </td>
+                                    <td>{{ athlete.meet_name }}</td>
+                                    <td>{{ athlete.meet_date }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> No boys' results found.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Girls Statistics -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h2><i class="fas fa-female text-danger"></i> Girls Best Times</h2>
+        {% if girls_by_distance %}
+            {% for distance, athletes in girls_by_distance.items() %}
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h4><i class="fas fa-route"></i> {{ distance }}</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Name</th>
+                                    <th>Best Time</th>
+                                    <th>Meet</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for athlete in athletes[:10] %}
+                                <tr>
+                                    <td>
+                                        {% if loop.index == 1 %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="fas fa-crown"></i> {{ loop.index }}
+                                            </span>
+                                        {% elif loop.index <= 3 %}
+                                            <span class="badge bg-secondary">{{ loop.index }}</span>
+                                        {% else %}
+                                            {{ loop.index }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ athlete.first_name }} {{ athlete.last_name }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="time-display text-danger">
+                                            {{ format_time(athlete.best_time) }}
+                                        </span>
+                                    </td>
+                                    <td>{{ athlete.meet_name }}</td>
+                                    <td>{{ athlete.meet_date }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> No girls' results found.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Error - Cross Country Stats{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4><i class="fas fa-exclamation-triangle"></i> Error</h4>
+            </div>
+            <div class="card-body">
+                <p class="card-text">{{ error }}</p>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    <i class="fas fa-home"></i> Return to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

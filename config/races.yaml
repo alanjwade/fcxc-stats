@@ -1,0 +1,97 @@
+# Example race configuration
+#
+# Field descriptions:
+# - name: Display name for the race
+# - url: MileSplit formatted results URL (for online scraping)
+# - file: Local HTML file path (for offline parsing)
+# - distance: Race distance (e.g., "5K", "3K", "1600m")
+# - race_class: Race category (e.g., "varsity", "jv", "freshman")
+# - gender: "boys", "girls", or "mixed"
+# - date: Race date in YYYY-MM-DD format
+# - season: Year of the season
+# 
+# Use either 'url' for online scraping or 'file' for local HTML files
+
+races:
+  # Rocky Mountain Lobo Invitational 2025 - August 23, 2025
+  - name: "Rocky Mountain Lobo Invitational 2025 - Varsity Boys"
+    file: "pages/Rocky Mountain Lobo Invitational 2025 - Varsity Boys (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Rocky Mountain High School, Fort Collins CO"
+    date: "2025-08-23"
+    season: "2025"
+
+  - name: "Rocky Mountain Lobo Invitational 2025 - Varsity Girls"
+    file: "pages/Rocky Mountain Lobo Invitational 2025 - Varsity Girls (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Rocky Mountain High School, Fort Collins CO"
+    date: "2025-08-23"
+    season: "2025"
+
+  - name: "Rocky Mountain Lobo Invitational 2025 - JV Boys"
+    file: "pages/Rocky Mountain Lobo Invitational 2025 - JV Boys (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "boys"
+    venue: "Rocky Mountain High School, Fort Collins CO"
+    date: "2025-08-23"
+    season: "2025"
+
+  - name: "Rocky Mountain Lobo Invitational 2025 - JV Girls"
+    file: "pages/Rocky Mountain Lobo Invitational 2025 - JV Girls (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "girls"
+    venue: "Rocky Mountain High School, Fort Collins CO"
+    date: "2025-08-23"
+    season: "2025"
+
+  # Vista Nation XC 2-Mile Invitational 2025 - August 23, 2025
+  - name: "Vista Nation XC 2-Mile Invitational 2025 - Boys Varsity"
+    file: "pages/Vista Nation XC 2-Mile Invitational 2025 - Boys Varsity (Raw).html"
+    distance: "2M"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Mountain Vista High School, Highlands Ranch CO"
+    date: "2025-08-23"
+    season: "2025"
+
+  - name: "Vista Nation XC 2-Mile Invitational 2025 - Girls Varsity"
+    file: "pages/Vista Nation XC 2-Mile Invitational 2025 - Girls Varsity (Raw).html"
+    distance: "2M"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Mountain Vista High School, Highlands Ranch CO"
+    date: "2025-08-23"
+    season: "2025"
+
+  - name: "Vista Nation XC 2-Mile Invitational 2025 - Boys Freshman/Sophomore"
+    file: "pages/Vista Nation XC 2-Mile Invitational 2025 - Boys Freshman_Sophomore (Raw).html"
+    distance: "2M"
+    race_class: "freshman"
+    gender: "boys"
+    venue: "Mountain Vista High School, Highlands Ranch CO"
+    date: "2025-08-23"
+    season: "2025"
+
+  - name: "Vista Nation XC 2-Mile Invitational 2025 - Girls Freshman/Sophomore"
+    file: "pages/Vista Nation XC 2-Mile Invitational 2025 - Girls Freshman_Sophomore (Raw).html"
+    distance: "2M"
+    race_class: "freshman"
+    gender: "girls"
+    venue: "Mountain Vista High School, Highlands Ranch CO"
+    date: "2025-08-23"
+    season: "2025"
+    
+
+# Team information
+team:
+  name: "Fort Collins High School"
+  abbreviation: "FCHS"
+  colors:
+    primary: "#FF0000"
+    secondary: "#FFFFFF"

@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}{{ athlete.first_name }} {{ athlete.last_name }} - Cross Country Stats{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>
+            {% if athlete.gender == 'male' %}
+                <i class="fas fa-male text-primary"></i>
+            {% else %}
+                <i class="fas fa-female text-danger"></i>
+            {% endif %}
+            {{ athlete.first_name }} {{ athlete.last_name }}
+        </h1>
+        <p class="lead">
+            {% if athlete.graduation_year %}
+                Class of {{ athlete.graduation_year }} •
+            {% endif %}
+            {{ athlete.gender.title() }} • {{ total_points }} Varsity Points
+        </p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('athletes_list') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Athletes
+        </a>
+    </div>
+</div>
+
+<!-- Personal Records -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h3><i class="fas fa-trophy text-warning"></i> Personal Records</h3>
+        {% if prs %}
+        <div class="row">
+            {% for pr in prs %}
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">{{ pr.distance }}</h5>
+                        <h2 class="card-text time-display text-primary">
+                            {{ format_time(pr.pr_seconds) }}
+                        </h2>
+                        <p class="text-muted">
+                            <small>{{ pr.race_count }} race{{ 's' if pr.race_count != 1 else '' }}</small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> No personal records found.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Race Results -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h3><i class="fas fa-list text-info"></i> Race Results</h3>
+        {% if results %}
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Meet</th>
+                                <th>Distance</th>
+                                <th>Class</th>
+                                <th>Time</th>
+                                <th>Place</th>
+                                <th>Points</th>
+                                <th>Venue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for result in results %}
+                            <tr>
+                                <td>{{ result.meet_date }}</td>
+                                <td>{{ result.meet_name }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ result.distance }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ result.race_class.title() }}</span>
+                                </td>
+                                <td>
+                                    <span class="time-display text-primary">
+                                        {{ format_time(result.time_seconds) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if result.place <= 3 %}
+                                        <span class="badge bg-warning text-dark">{{ result.place }}</span>
+                                    {% elif result.place <= 10 %}
+                                        <span class="badge bg-success">{{ result.place }}</span>
+                                    {% else %}
+                                        {{ result.place }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if result.varsity_points > 0 %}
+                                        <span class="badge bg-primary">{{ result.varsity_points }}</span>
+                                    {% else %}
+                                        <span class="text-muted">0</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ result.venue_name or 'N/A' }}</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> No race results found for this athlete.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Progress Charts for each distance -->
+{% if prs %}
+<div class="row">
+    <div class="col-12">
+        <h3><i class="fas fa-chart-line text-success"></i> Progress Over Time</h3>
+        {% for pr in prs %}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5>{{ pr.distance }} Progress</h5>
+            </div>
+            <div class="card-body">
+                <div id="progress-chart-{{ pr.distance.replace('K', 'k').replace(' ', '-') }}" style="height: 300px;"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if prs %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% for pr in prs %}
+    // Fetch progress data for {{ pr.distance }}
+    fetch('/api/athlete/{{ athlete.id }}/progress/{{ pr.distance }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.length > 0) {
+                const dates = data.map(d => d.date);
+                const times = data.map(d => d.time);
+                const meets = data.map(d => d.meet);
+                const formatted_times = data.map(d => d.formatted_time);
+                
+                const trace = {
+                    x: dates,
+                    y: times,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: {color: '#007bff'},
+                    marker: {size: 8},
+                    text: meets,
+                    hovertemplate: '<b>%{text}</b><br>Date: %{x}<br>Time: ' + 
+                                   formatted_times.map((t, i) => '%{y}' + ' (' + t + ')').join('') + 
+                                   '<extra></extra>'
+                };
+                
+                const layout = {
+                    title: '{{ pr.distance }} Performance Over Time',
+                    xaxis: {
+                        title: 'Date',
+                        type: 'date'
+                    },
+                    yaxis: {
+                        title: 'Time (seconds)',
+                        autorange: 'reversed'  // Lower times are better
+                    },
+                    hovermode: 'closest'
+                };
+                
+                Plotly.newPlot('progress-chart-{{ pr.distance.replace("K", "k").replace(" ", "-") }}', [trace], layout);
+            }
+        })
+        .catch(error => console.error('Error fetching progress data:', error));
+    {% endfor %}
+});
+</script>
+{% endif %}
+{% endblock %}

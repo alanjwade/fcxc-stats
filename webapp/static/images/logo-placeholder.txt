@@ -1,0 +1,8 @@
+To add your Fort Collins High School logo:
+
+1. Save your logo image as 'logo.png' in this directory: /home/alan/Documents/code/fcxc_stats/webapp/static/images/
+2. The logo should be approximately 40px tall for best display in the navigation bar
+3. Supported formats: PNG, JPG, SVG
+4. The logo will automatically appear in the navigation bar once the file is added
+
+The website will check for the logo and show it if available, otherwise it will show just the text and running icon.
