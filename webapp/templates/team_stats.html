@@ -28,6 +28,7 @@
                                     <th>Rank</th>
                                     <th>Name</th>
                                     <th>Best Time</th>
+                                    <th>Pace</th>
                                     <th>Meet</th>
                                     <th>Date</th>
                                 </tr>
@@ -52,6 +53,11 @@
                                     <td>
                                         <span class="time-display text-primary">
                                             {{ format_time(athlete.best_time) }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="pace-display text-success">
+                                            {{ calculate_pace(athlete.best_time, distance) }}
                                         </span>
                                     </td>
                                     <td>{{ athlete.meet_name }}</td>
@@ -90,6 +96,7 @@
                                     <th>Rank</th>
                                     <th>Name</th>
                                     <th>Best Time</th>
+                                    <th>Pace</th>
                                     <th>Meet</th>
                                     <th>Date</th>
                                 </tr>
@@ -114,6 +121,11 @@
                                     <td>
                                         <span class="time-display text-danger">
                                             {{ format_time(athlete.best_time) }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="pace-display text-success">
+                                            {{ calculate_pace(athlete.best_time, distance) }}
                                         </span>
                                     </td>
                                     <td>{{ athlete.meet_name }}</td>

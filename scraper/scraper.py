@@ -12,6 +12,7 @@ import re
 import time
 import yaml
 import logging
+import argparse
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 import requests
@@ -27,7 +28,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RaceConfig:
-    name: str
+    meet_name: str
+    race_name: str
     distance: str
     race_class: str
     gender: str
@@ -48,7 +50,7 @@ class Athlete:
 @dataclass
 class Result:
     athlete: Athlete
-    time_seconds: int
+    time_seconds: float  # Changed to float to support fractional seconds
     place: int
     varsity_points: int = 0
 
@@ -102,16 +104,16 @@ class MileSplitScraper:
         }
         return gender_map.get(config_gender.lower(), config_gender.lower())
 
-    def parse_time_to_seconds(self, time_str: str) -> Optional[int]:
-        """Parse time string (MM:SS.ss, MM:SS, or extended formats) to total seconds."""
+    def parse_time_to_seconds(self, time_str: str) -> Optional[float]:
+        """Parse time string (MM:SS.ss, MM:SS, or extended formats) to total seconds with fractional support."""
         time_str = time_str.strip()
         
-        # Handle different time formats seen in MileSplit
+        # Handle different time formats seen in MileSplit (order matters!)
         patterns = [
+            r'(\d{1,2}):(\d{2}):(\d{2})\.(\d{2})', # H:MM:SS.ss (for very long times) - CHECK FIRST
+            r'(\d{1,2}):(\d{2}):(\d{2})',        # H:MM:SS - CHECK SECOND  
             r'(\d{1,2}):(\d{2})\.(\d{2})',      # MM:SS.ss
             r'(\d{1,2}):(\d{2})',              # MM:SS
-            r'(\d{2}):(\d{2}):(\d{2})\.(\d{2})', # HH:MM:SS.ss (for very long times)
-            r'(\d{2}):(\d{2}):(\d{2})',        # HH:MM:SS
             r'(\d{3,4})\.(\d{2})'              # SSS.ss or SSSS.ss (seconds only)
         ]
         
@@ -120,23 +122,23 @@ class MileSplitScraper:
             if match:
                 groups = match.groups()
                 
-                if i == 0:  # MM:SS.ss
-                    minutes, seconds, hundredths = groups
-                    return int(minutes) * 60 + int(seconds)
-                elif i == 1:  # MM:SS
-                    minutes, seconds = groups
-                    return int(minutes) * 60 + int(seconds)
-                elif i == 2:  # HH:MM:SS.ss
+                if i == 0:  # H:MM:SS.ss
                     hours, minutes, seconds, hundredths = groups
-                    return int(hours) * 3600 + int(minutes) * 60 + int(seconds)
-                elif i == 3:  # HH:MM:SS
+                    return float(int(hours) * 3600 + int(minutes) * 60 + int(seconds)) + float(int(hundredths)) / 100.0
+                elif i == 1:  # H:MM:SS
                     hours, minutes, seconds = groups
-                    return int(hours) * 3600 + int(minutes) * 60 + int(seconds)
+                    return float(int(hours) * 3600 + int(minutes) * 60 + int(seconds))
+                elif i == 2:  # MM:SS.ss
+                    minutes, seconds, hundredths = groups
+                    return float(int(minutes) * 60 + int(seconds)) + float(int(hundredths)) / 100.0
+                elif i == 3:  # MM:SS
+                    minutes, seconds = groups
+                    return float(int(minutes) * 60 + int(seconds))
                 elif i == 4:  # SSS.ss or SSSS.ss
                     seconds, hundredths = groups
-                    return int(seconds)
+                    return float(int(seconds)) + float(int(hundredths)) / 100.0
         
-        logger.warning(f"Could not parse time: {time_str}")
+        logger.warning(f"Could not parse time format: {time_str}")
         return None
 
     def scrape_race_results(self, source: str, is_file: bool = False) -> List[Result]:
@@ -550,9 +552,9 @@ class MileSplitScraper:
             return str(result.fetchone()[0])
 
     def store_race_results(self, race_config: RaceConfig, results: List[Result]):
-        """Store race results in the database."""
+        """Store race results in the database, avoiding duplicates."""
         if not results:
-            logger.warning(f"No results to store for race: {race_config.name}")
+            logger.warning(f"No results to store for race: {race_config.race_name}")
             return
         
         try:
@@ -560,59 +562,159 @@ class MileSplitScraper:
                 # Get or create venue
                 venue_id = self.get_or_create_venue(race_config.venue)
                 
-                # Create meet
+                # Check if meet already exists, if not create it
                 meet_result = conn.execute(
                     text("""
-                        INSERT INTO meets (name, meet_date, venue_id, season, milesplit_url)
-                        VALUES (:name, :meet_date, :venue_id, :season, :url)
-                        RETURNING id
+                        SELECT id FROM meets 
+                        WHERE name = :name AND meet_date = :meet_date AND venue_id = :venue_id
                     """),
                     {
-                        "name": race_config.name,
+                        "name": race_config.meet_name,
                         "meet_date": race_config.date,
-                        "venue_id": venue_id,
-                        "season": race_config.season,
-                        "url": race_config.url
+                        "venue_id": venue_id
                     }
-                )
-                meet_id = str(meet_result.fetchone()[0])
+                ).fetchone()
                 
-                # Create race
+                if meet_result:
+                    meet_id = str(meet_result[0])
+                else:
+                    # Create new meet
+                    meet_result = conn.execute(
+                        text("""
+                            INSERT INTO meets (name, meet_date, venue_id, season, milesplit_url)
+                            VALUES (:name, :meet_date, :venue_id, :season, :url)
+                            RETURNING id
+                        """),
+                        {
+                            "name": race_config.meet_name,
+                            "meet_date": race_config.date,
+                            "venue_id": venue_id,
+                            "season": race_config.season,
+                            "url": race_config.url
+                        }
+                    )
+                    meet_id = str(meet_result.fetchone()[0])
+                
+                # Check if race already exists
                 race_result = conn.execute(
                     text("""
-                        INSERT INTO races (meet_id, distance, race_class, gender)
-                        VALUES (:meet_id, :distance, :race_class, :gender)
-                        RETURNING id
+                        SELECT id FROM races 
+                        WHERE meet_id = :meet_id AND name = :name AND distance = :distance 
+                        AND race_class = :race_class AND gender = :gender
                     """),
                     {
                         "meet_id": meet_id,
+                        "name": race_config.race_name,
                         "distance": race_config.distance,
                         "race_class": race_config.race_class,
                         "gender": self.map_gender_for_db(race_config.gender)
                     }
-                )
-                race_id = str(race_result.fetchone()[0])
+                ).fetchone()
                 
-                # Store results
-                for result in results:
-                    athlete_id = self.get_or_create_athlete(result.athlete)
+                if race_result:
+                    race_id = str(race_result[0])
+                    logger.info(f"Race already exists: {race_config.race_name} - checking for new results")
                     
-                    conn.execute(
+                    # Get existing results for this race to avoid duplicates
+                    existing_results = conn.execute(
                         text("""
-                            INSERT INTO results (race_id, athlete_id, time_seconds, place, varsity_points)
-                            VALUES (:race_id, :athlete_id, :time_seconds, :place, :varsity_points)
+                            SELECT a.first_name, a.last_name, a.school, res.time_seconds, res.place
+                            FROM results res
+                            JOIN athletes a ON res.athlete_id = a.id
+                            WHERE res.race_id = :race_id
+                        """),
+                        {"race_id": race_id}
+                    ).fetchall()
+                    
+                    # Create a set of existing results for quick lookup
+                    existing_set = set()
+                    for existing in existing_results:
+                        # Use normalized names and times for comparison
+                        first_name = existing.first_name.strip().lower()
+                        last_name = existing.last_name.strip().lower()
+                        school = existing.school.strip().lower()
+                        # Round time to 2 decimal places to handle minor variations
+                        time_seconds = round(float(existing.time_seconds), 2)
+                        place = existing.place
+                        key = (first_name, last_name, school, time_seconds, place)
+                        existing_set.add(key)
+                    
+                    new_results_count = 0
+                    skipped_results_count = 0
+                    for result in results:
+                        # Normalize result data for comparison
+                        first_name = result.athlete.first_name.strip().lower()
+                        last_name = result.athlete.last_name.strip().lower()
+                        school = result.athlete.school.strip().lower()
+                        time_seconds = round(result.time_seconds, 2)
+                        place = result.place
+                        result_key = (first_name, last_name, school, time_seconds, place)
+                        
+                        if result_key not in existing_set:
+                            athlete_id = self.get_or_create_athlete(result.athlete)
+                            conn.execute(
+                                text("""
+                                    INSERT INTO results (race_id, athlete_id, time_seconds, place, varsity_points)
+                                    VALUES (:race_id, :athlete_id, :time_seconds, :place, :varsity_points)
+                                """),
+                                {
+                                    "race_id": race_id,
+                                    "athlete_id": athlete_id,
+                                    "time_seconds": result.time_seconds,
+                                    "place": result.place,
+                                    "varsity_points": result.varsity_points
+                                }
+                            )
+                            new_results_count += 1
+                        else:
+                            skipped_results_count += 1
+                    
+                    if new_results_count > 0:
+                        logger.info(f"Added {new_results_count} new results for race: {race_config.race_name}")
+                    if skipped_results_count > 0:
+                        logger.info(f"Skipped {skipped_results_count} duplicate results for race: {race_config.race_name}")
+                    if new_results_count == 0 and skipped_results_count == 0:
+                        logger.info(f"No new results to add for race: {race_config.race_name}")
+                        
+                else:
+                    # Create new race
+                    race_result = conn.execute(
+                        text("""
+                            INSERT INTO races (meet_id, name, distance, race_class, gender)
+                            VALUES (:meet_id, :name, :distance, :race_class, :gender)
+                            RETURNING id
                         """),
                         {
-                            "race_id": race_id,
-                            "athlete_id": athlete_id,
-                            "time_seconds": result.time_seconds,
-                            "place": result.place,
-                            "varsity_points": result.varsity_points
+                            "meet_id": meet_id,
+                            "name": race_config.race_name,
+                            "distance": race_config.distance,
+                            "race_class": race_config.race_class,
+                            "gender": self.map_gender_for_db(race_config.gender)
                         }
                     )
+                    race_id = str(race_result.fetchone()[0])
+                    
+                    # Store all results for new race
+                    for result in results:
+                        athlete_id = self.get_or_create_athlete(result.athlete)
+                        
+                        conn.execute(
+                            text("""
+                                INSERT INTO results (race_id, athlete_id, time_seconds, place, varsity_points)
+                                VALUES (:race_id, :athlete_id, :time_seconds, :place, :varsity_points)
+                            """),
+                            {
+                                "race_id": race_id,
+                                "athlete_id": athlete_id,
+                                "time_seconds": result.time_seconds,
+                                "place": result.place,
+                                "varsity_points": result.varsity_points
+                            }
+                        )
+                    
+                    logger.info(f"Created new race and stored {len(results)} results: {race_config.race_name}")
                 
                 conn.commit()
-                logger.info(f"Stored {len(results)} results for race: {race_config.name}")
                 
         except Exception as e:
             logger.error(f"Error storing race results: {e}")
@@ -620,15 +722,26 @@ class MileSplitScraper:
 
 def main():
     """Main function to run the scraper."""
+    parser = argparse.ArgumentParser(description='Cross Country Statistics Scraper')
+    parser.add_argument('--clear-db', action='store_true', 
+                       help='Clear all existing data before scraping')
+    parser.add_argument('--config', type=str, default='/app/config/races.yaml',
+                       help='Path to races configuration file')
+    
+    args = parser.parse_args()
+    
     database_url = os.getenv('DATABASE_URL')
     if not database_url:
         logger.error("DATABASE_URL environment variable not set")
         sys.exit(1)
     
-    config_path = os.getenv('CONFIG_PATH', '/app/config/races.yaml')
+    config_path = args.config
     if not os.path.exists(config_path):
-        logger.error(f"Config file not found: {config_path}")
-        sys.exit(1)
+        # Fallback to environment variable if file not found
+        config_path = os.getenv('CONFIG_PATH', '/app/config/races.yaml')
+        if not os.path.exists(config_path):
+            logger.error(f"Config file not found: {config_path}")
+            sys.exit(1)
     
     scraper = MileSplitScraper(database_url)
     race_configs = scraper.load_race_config(config_path)
@@ -639,11 +752,14 @@ def main():
     
     logger.info(f"Found {len(race_configs)} races to scrape")
     
-    # Clear existing data before scraping to avoid duplicates
-    scraper.clear_database()
+    # Clear database if requested
+    if args.clear_db:
+        logger.info("Clearing existing data before scraping...")
+        scraper.clear_database()
     
+    # Process each race, checking for duplicates
     for race_config in race_configs:
-        logger.info(f"Processing race: {race_config.name}")
+        logger.info(f"Processing race: {race_config.meet_name} - {race_config.race_name}")
         try:
             # Determine source and type
             if race_config.file:
@@ -659,16 +775,16 @@ def main():
                 # Use URL
                 results = scraper.scrape_race_results(race_config.url, is_file=False)
             else:
-                logger.error(f"No source (URL or file) specified for race: {race_config.name}")
+                logger.error(f"No source (URL or file) specified for race: {race_config.race_name}")
                 continue
                 
             if results:
                 scraper.store_race_results(race_config, results)
             else:
-                logger.warning(f"No results found for race: {race_config.name}")
+                logger.warning(f"No results found for race: {race_config.race_name}")
                 
         except Exception as e:
-            logger.error(f"Error processing race {race_config.name}: {e}")
+            logger.error(f"Error processing race {race_config.race_name}: {e}")
             continue
         
         # Be respectful to the server

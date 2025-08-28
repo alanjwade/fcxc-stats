@@ -38,6 +38,7 @@ CREATE TABLE meets (
 CREATE TABLE races (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     meet_id UUID REFERENCES meets(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL, -- e.g., 'Varsity Boys', 'JV Girls', 'Freshman/Sophomore Boys'
     distance VARCHAR(20) NOT NULL, -- e.g., '5K', '3K', '1600m'
     race_class VARCHAR(20) NOT NULL, -- e.g., 'varsity', 'jv', 'freshman'
     gender VARCHAR(10) NOT NULL CHECK (gender IN ('male', 'female', 'mixed')),
@@ -49,7 +50,7 @@ CREATE TABLE results (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     race_id UUID REFERENCES races(id) ON DELETE CASCADE,
     athlete_id UUID REFERENCES athletes(id) ON DELETE CASCADE,
-    time_seconds INTEGER NOT NULL, -- Time in seconds for easier calculations
+    time_seconds NUMERIC(8,3) NOT NULL, -- Time in seconds with fractional support (e.g., 1005.123 for 16:45.123)
     place INTEGER,
     varsity_points INTEGER DEFAULT 0, -- Points scored for varsity team
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -94,11 +95,35 @@ JOIN results res ON a.id = res.athlete_id
 JOIN races r ON res.race_id = r.id
 GROUP BY a.gender, r.distance, r.race_class;
 
--- Function to format time from seconds to MM:SS format
-CREATE OR REPLACE FUNCTION format_time(seconds INTEGER)
+-- Function to format time from seconds to MM:SS.ss format
+CREATE OR REPLACE FUNCTION format_time(seconds NUMERIC)
 RETURNS TEXT AS $$
+DECLARE
+    total_seconds INTEGER;
+    fractional_part NUMERIC;
+    minutes INTEGER;
+    secs INTEGER;
+    centiseconds INTEGER;
 BEGIN
-    RETURN LPAD((seconds / 60)::TEXT, 2, '0') || ':' || 
-           LPAD((seconds % 60)::TEXT, 2, '0');
+    -- Handle NULL input
+    IF seconds IS NULL THEN
+        RETURN NULL;
+    END IF;
+    
+    -- Split into whole seconds and fractional part
+    total_seconds := FLOOR(seconds)::INTEGER;
+    fractional_part := seconds - total_seconds;
+    
+    -- Calculate minutes and remaining seconds
+    minutes := total_seconds / 60;
+    secs := total_seconds % 60;
+    
+    -- Get centiseconds (hundredths)
+    centiseconds := ROUND(fractional_part * 100)::INTEGER;
+    
+    -- Format as MM:SS.ss
+    RETURN LPAD(minutes::TEXT, 2, '0') || ':' || 
+           LPAD(secs::TEXT, 2, '0') || '.' ||
+           LPAD(centiseconds::TEXT, 2, '0');
 END;
 $$ LANGUAGE plpgsql;

@@ -13,7 +13,8 @@ import os
 import io
 import csv
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
+import decimal
 from flask import Flask, render_template, jsonify, send_file, request, redirect, url_for
 from sqlalchemy import create_engine, text
 import logging
@@ -35,15 +36,91 @@ engine = create_engine(DATABASE_URL)
 # Filter for Fort Collins High School only
 SCHOOL_FILTER = "Fort Collins High School"
 
-def format_time(seconds: int) -> str:
-    """Format time from seconds to MM:SS format."""
-    minutes = seconds // 60
-    secs = seconds % 60
-    return f"{minutes:02d}:{secs:02d}"
+def format_time(seconds: Union[float, decimal.Decimal]) -> str:
+    """Format time from seconds to MM:SS.ss format with fractional seconds."""
+    if seconds is None:
+        return "N/A"
+    
+    # Convert to float if it's a Decimal
+    if isinstance(seconds, decimal.Decimal):
+        seconds = float(seconds)
+    
+    # Split into whole seconds and fractional part
+    total_seconds = int(seconds)
+    fractional_part = seconds - total_seconds
+    
+    # Calculate minutes and remaining seconds
+    minutes = total_seconds // 60
+    secs = total_seconds % 60
+    
+    # Get centiseconds (hundredths)
+    centiseconds = int(round(fractional_part * 100))
+    
+    # Format as MM:SS.ss
+    return f"{minutes:02d}:{secs:02d}.{centiseconds:02d}"
+
+def distance_to_miles(distance: str) -> float:
+    """Convert race distance to miles for pace calculation."""
+    distance_map = {
+        # Kilometer distances
+        '5K': 3.10686,    # 5 kilometers = 3.10686 miles
+        '3K': 1.86411,    # 3 kilometers = 1.86411 miles
+        '8K': 4.97097,    # 8 kilometers = 4.97097 miles
+        '10K': 6.21371,   # 10 kilometers = 6.21371 miles
+        
+        # Mile distances
+        '1M': 1.0,        # 1 mile
+        '2M': 2.0,        # 2 miles
+        '3M': 3.0,        # 3 miles
+        '1 Mile': 1.0,    # 1 mile (alternate format)
+        '2 Mile': 2.0,    # 2 miles (alternate format)
+        '3 Mile': 3.0,    # 3 miles (alternate format)
+        
+        # Meter distances
+        '1600M': 0.99419, # 1600 meters = 0.99419 miles
+        '3200M': 1.98838, # 3200 meters = 1.98838 miles
+        '5000M': 3.10686, # 5000 meters = 3.10686 miles
+        '8000M': 4.97097, # 8000 meters = 4.97097 miles
+        '10000M': 6.21371, # 10000 meters = 6.21371 miles
+    }
+    if distance not in distance_map:
+        logger.warning(f"Unknown distance '{distance}' - defaulting to 1.0 miles for pace calculation")
+    return distance_map.get(distance, 1.0)  # Default to 1.0 if unknown distance
+
+def calculate_pace(time_seconds: Union[float, decimal.Decimal], distance: str) -> str:
+    """Calculate pace per mile in MM:SS.ss format."""
+    if time_seconds is None:
+        return "N/A"
+    
+    # Convert to float if it's a Decimal
+    if isinstance(time_seconds, decimal.Decimal):
+        time_seconds = float(time_seconds)
+    
+    miles = distance_to_miles(distance)
+    if miles == 0:
+        return "N/A"
+    
+    pace_seconds = time_seconds / miles
+    pace_minutes = int(pace_seconds // 60)
+    pace_secs = int(pace_seconds % 60)
+    pace_centiseconds = int(round((pace_seconds % 1) * 100))
+    
+    return f"{pace_minutes:02d}:{pace_secs:02d}.{pace_centiseconds:02d}"
+
+def get_supported_distances():
+    """Return list of all supported race distances."""
+    return ['5K', '3K', '8K', '10K', '1M', '2M', '3M', '1 Mile', '2 Mile', '3 Mile', 
+            '1600M', '3200M', '5000M', '8000M', '10000M']
 
 def get_db_connection():
     """Get database connection."""
     return engine.connect()
+
+# Make functions available in templates
+app.jinja_env.globals.update(
+    format_time=format_time,
+    calculate_pace=calculate_pace
+)
 
 @app.route('/')
 def index():
@@ -128,12 +205,13 @@ def export_csv():
             output = io.StringIO()
             writer = csv.writer(output)
             
-            # Header row: First Name, Last Name, Gender, then one column per meet
+            # Header row: First Name, Last Name, Gender, then time/pace columns per meet
             header = ['First Name', 'Last Name', 'Gender']
             for meet in meets:
-                # Format meet name and date for column header
+                # Format meet name and date for column headers
                 meet_header = f"{meet.name} ({meet.meet_date})"
-                header.append(meet_header)
+                header.append(f"{meet_header} Time")
+                header.append(f"{meet_header} Pace")
             
             writer.writerow(header)
             
@@ -143,9 +221,9 @@ def export_csv():
                 
                 # For each meet, find this athlete's time (if they participated)
                 for meet in meets:
-                    # Get athlete's time in this meet
+                    # Get athlete's time and distance in this meet
                     time_query = text("""
-                        SELECT res.time_seconds
+                        SELECT res.time_seconds, r.distance
                         FROM results res
                         JOIN races r ON res.race_id = r.id
                         JOIN meets m ON r.meet_id = m.id
@@ -162,8 +240,10 @@ def export_csv():
                     
                     if result:
                         row.append(format_time(result.time_seconds))
+                        row.append(calculate_pace(result.time_seconds, result.distance))
                     else:
-                        row.append('')  # Empty cell if athlete didn't participate
+                        row.append('')  # Empty time cell if athlete didn't participate
+                        row.append('')  # Empty pace cell if athlete didn't participate
                 
                 writer.writerow(row)
             
@@ -194,13 +274,14 @@ def team_stats():
                     r.distance,
                     MIN(res.time_seconds) as best_time,
                     m.name as meet_name,
+                    r.name as race_name,
                     m.meet_date
                 FROM athletes a
                 JOIN results res ON a.id = res.athlete_id
                 JOIN races r ON res.race_id = r.id
                 JOIN meets m ON r.meet_id = m.id
                 WHERE a.gender = 'male' AND a.school = :school
-                GROUP BY a.id, a.first_name, a.last_name, r.distance, m.name, m.meet_date
+                GROUP BY a.id, a.first_name, a.last_name, r.distance, m.name, r.name, m.meet_date
                 ORDER BY r.distance, best_time ASC
             """)
             
@@ -211,13 +292,14 @@ def team_stats():
                     r.distance,
                     MIN(res.time_seconds) as best_time,
                     m.name as meet_name,
+                    r.name as race_name,
                     m.meet_date
                 FROM athletes a
                 JOIN results res ON a.id = res.athlete_id
                 JOIN races r ON res.race_id = r.id
                 JOIN meets m ON r.meet_id = m.id
                 WHERE a.gender = 'female' AND a.school = :school
-                GROUP BY a.id, a.first_name, a.last_name, r.distance, m.name, m.meet_date
+                GROUP BY a.id, a.first_name, a.last_name, r.distance, m.name, r.name, m.meet_date
                 ORDER BY r.distance, best_time ASC
             """)
             
@@ -274,6 +356,7 @@ def athlete_stats(athlete_id):
                     res.varsity_points,
                     r.distance,
                     r.race_class,
+                    r.name as race_name,
                     m.name as meet_name,
                     m.meet_date,
                     v.name as venue_name
@@ -302,14 +385,14 @@ def athlete_stats(athlete_id):
             
             prs = conn.execute(prs_query, {'athlete_id': athlete_id}).fetchall()
             
-            # Calculate total varsity points
-            total_points = sum(result.varsity_points for result in results)
+            # Calculate number of varsity races run
+            varsity_races = sum(1 for result in results if result.race_class == 'varsity')
             
             return render_template('athlete_stats.html',
                                  athlete=athlete,
                                  results=results,
                                  prs=prs,
-                                 total_points=total_points,
+                                 varsity_races=varsity_races,
                                  format_time=format_time)
     
     except Exception as e:
@@ -372,9 +455,11 @@ def athlete_progress_api(athlete_id, distance):
             
             data = [{
                 'date': str(p.meet_date),
-                'time': p.time_seconds,
+                'time': float(p.time_seconds),
+                'pace': calculate_pace(float(p.time_seconds), distance),
+                'pace_seconds': float(p.time_seconds) / distance_to_miles(distance),
                 'meet': p.meet_name,
-                'formatted_time': format_time(p.time_seconds)
+                'formatted_time': format_time(float(p.time_seconds))
             } for p in progress]
             
             return jsonify(data)

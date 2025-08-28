@@ -34,6 +34,7 @@ This directory (`scraper/pages/`) is used to store downloaded HTML files from Mi
 - Keep the original HTML structure intact for better parsing
 - If you have both `url` and `file` specified, `file` takes precedence
 - Test with the sample file first: `pages/sample_results.html`
+- **Note**: HTML files in this directory are excluded from git tracking to avoid committing large source files
 
 ## File Structure
 

@@ -1,7 +1,8 @@
 # Example race configuration
 #
 # Field descriptions:
-# - name: Display name for the race
+# - meet_name: Display name for the meet/event
+# - race_name: Display name for the specific race (e.g., "Varsity Boys", "JV Girls")
 # - url: MileSplit formatted results URL (for online scraping)
 # - file: Local HTML file path (for offline parsing)
 # - distance: Race distance (e.g., "5K", "3K", "1600m")
@@ -14,7 +15,8 @@
 
 races:
   # Rocky Mountain Lobo Invitational 2025 - August 23, 2025
-  - name: "Rocky Mountain Lobo Invitational 2025 - Varsity Boys"
+  - meet_name: "Rocky Mountain Lobo Invitational 2025"
+    race_name: "Varsity Boys"
     file: "pages/Rocky Mountain Lobo Invitational 2025 - Varsity Boys (Raw).html"
     distance: "5K"
     race_class: "varsity"
@@ -23,7 +25,8 @@ races:
     date: "2025-08-23"
     season: "2025"
 
-  - name: "Rocky Mountain Lobo Invitational 2025 - Varsity Girls"
+  - meet_name: "Rocky Mountain Lobo Invitational 2025"
+    race_name: "Varsity Girls"
     file: "pages/Rocky Mountain Lobo Invitational 2025 - Varsity Girls (Raw).html"
     distance: "5K"
     race_class: "varsity"
@@ -32,7 +35,8 @@ races:
     date: "2025-08-23"
     season: "2025"
 
-  - name: "Rocky Mountain Lobo Invitational 2025 - JV Boys"
+  - meet_name: "Rocky Mountain Lobo Invitational 2025"
+    race_name: "JV Boys"
     file: "pages/Rocky Mountain Lobo Invitational 2025 - JV Boys (Raw).html"
     distance: "5K"
     race_class: "jv"
@@ -41,7 +45,8 @@ races:
     date: "2025-08-23"
     season: "2025"
 
-  - name: "Rocky Mountain Lobo Invitational 2025 - JV Girls"
+  - meet_name: "Rocky Mountain Lobo Invitational 2025"
+    race_name: "JV Girls"
     file: "pages/Rocky Mountain Lobo Invitational 2025 - JV Girls (Raw).html"
     distance: "5K"
     race_class: "jv"
@@ -51,7 +56,8 @@ races:
     season: "2025"
 
   # Vista Nation XC 2-Mile Invitational 2025 - August 23, 2025
-  - name: "Vista Nation XC 2-Mile Invitational 2025 - Boys Varsity"
+  - meet_name: "Vista Nation XC 2-Mile Invitational 2025"
+    race_name: "Boys Varsity"
     file: "pages/Vista Nation XC 2-Mile Invitational 2025 - Boys Varsity (Raw).html"
     distance: "2M"
     race_class: "varsity"
@@ -60,7 +66,8 @@ races:
     date: "2025-08-23"
     season: "2025"
 
-  - name: "Vista Nation XC 2-Mile Invitational 2025 - Girls Varsity"
+  - meet_name: "Vista Nation XC 2-Mile Invitational 2025"
+    race_name: "Girls Varsity"
     file: "pages/Vista Nation XC 2-Mile Invitational 2025 - Girls Varsity (Raw).html"
     distance: "2M"
     race_class: "varsity"
@@ -69,19 +76,21 @@ races:
     date: "2025-08-23"
     season: "2025"
 
-  - name: "Vista Nation XC 2-Mile Invitational 2025 - Boys Freshman/Sophomore"
+  - meet_name: "Vista Nation XC 2-Mile Invitational 2025"
+    race_name: "Boys Freshman/Sophomore"
     file: "pages/Vista Nation XC 2-Mile Invitational 2025 - Boys Freshman_Sophomore (Raw).html"
     distance: "2M"
-    race_class: "freshman"
+    race_class: "varsity"
     gender: "boys"
     venue: "Mountain Vista High School, Highlands Ranch CO"
     date: "2025-08-23"
     season: "2025"
 
-  - name: "Vista Nation XC 2-Mile Invitational 2025 - Girls Freshman/Sophomore"
+  - meet_name: "Vista Nation XC 2-Mile Invitational 2025"
+    race_name: "Girls Freshman/Sophomore"
     file: "pages/Vista Nation XC 2-Mile Invitational 2025 - Girls Freshman_Sophomore (Raw).html"
     distance: "2M"
-    race_class: "freshman"
+    race_class: "varsity"
     gender: "girls"
     venue: "Mountain Vista High School, Highlands Ranch CO"
     date: "2025-08-23"

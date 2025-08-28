@@ -17,7 +17,7 @@
             {% if athlete.graduation_year %}
                 Class of {{ athlete.graduation_year }} •
             {% endif %}
-            {{ athlete.gender.title() }} • {{ total_points }} Varsity Points
+            {{ athlete.gender.title() }} • {{ varsity_races }} Varsity Race{{ 's' if varsity_races != 1 else '' }}
         </p>
     </div>
     <div class="col-auto">
@@ -41,6 +41,9 @@
                         <h2 class="card-text time-display text-primary">
                             {{ format_time(pr.pr_seconds) }}
                         </h2>
+                        <p class="pace-display text-success mb-2">
+                            <strong>{{ calculate_pace(pr.pr_seconds, pr.distance) }} pace</strong>
+                        </p>
                         <p class="text-muted">
                             <small>{{ pr.race_count }} race{{ 's' if pr.race_count != 1 else '' }}</small>
                         </p>
@@ -70,11 +73,12 @@
                             <tr>
                                 <th>Date</th>
                                 <th>Meet</th>
+                                <th>Race</th>
                                 <th>Distance</th>
                                 <th>Class</th>
                                 <th>Time</th>
+                                <th>Pace</th>
                                 <th>Place</th>
-                                <th>Points</th>
                                 <th>Venue</th>
                             </tr>
                         </thead>
@@ -84,14 +88,30 @@
                                 <td>{{ result.meet_date }}</td>
                                 <td>{{ result.meet_name }}</td>
                                 <td>
+                                    <span class="badge bg-primary">{{ result.race_name }}</span>
+                                </td>
+                                <td>
                                     <span class="badge bg-secondary">{{ result.distance }}</span>
                                 </td>
                                 <td>
-                                    <span class="badge bg-info">{{ result.race_class.title() }}</span>
+                                    {% if result.race_class == 'varsity' %}
+                                        <span class="badge bg-primary">Varsity</span>
+                                    {% elif result.race_class == 'jv' %}
+                                        <span class="badge bg-success">JV</span>
+                                    {% elif result.race_class == 'freshman' %}
+                                        <span class="badge bg-info">Frosh</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ result.race_class.title() }}</span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <span class="time-display text-primary">
                                         {{ format_time(result.time_seconds) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="pace-display text-success">
+                                        {{ calculate_pace(result.time_seconds, result.distance) }}
                                     </span>
                                 </td>
                                 <td>
@@ -101,13 +121,6 @@
                                         <span class="badge bg-success">{{ result.place }}</span>
                                     {% else %}
                                         {{ result.place }}
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if result.varsity_points > 0 %}
-                                        <span class="badge bg-primary">{{ result.varsity_points }}</span>
-                                    {% else %}
-                                        <span class="text-muted">0</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -160,19 +173,39 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.length > 0) {
                 const dates = data.map(d => d.date);
                 const times = data.map(d => d.time);
+                const paces = data.map(d => d.pace_seconds);
                 const meets = data.map(d => d.meet);
                 const formatted_times = data.map(d => d.formatted_time);
+                const formatted_paces = data.map(d => d.pace);
                 
-                const trace = {
+                // Time trace
+                const timeTrace = {
                     x: dates,
                     y: times,
                     type: 'scatter',
                     mode: 'lines+markers',
                     line: {color: '#007bff'},
                     marker: {size: 8},
+                    name: 'Time',
                     text: meets,
                     hovertemplate: '<b>%{text}</b><br>Date: %{x}<br>Time: ' + 
-                                   formatted_times.map((t, i) => '%{y}' + ' (' + t + ')').join('') + 
+                                   formatted_times.map((t, i) => t).join('') + 
+                                   '<extra></extra>'
+                };
+                
+                // Pace trace (on secondary y-axis)
+                const paceTrace = {
+                    x: dates,
+                    y: paces,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: {color: '#28a745'},
+                    marker: {size: 8},
+                    name: 'Pace',
+                    yaxis: 'y2',
+                    text: meets,
+                    hovertemplate: '<b>%{text}</b><br>Date: %{x}<br>Pace: ' + 
+                                   formatted_paces.map((p, i) => p + '/mile').join('') + 
                                    '<extra></extra>'
                 };
                 
@@ -184,12 +217,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     yaxis: {
                         title: 'Time (seconds)',
-                        autorange: 'reversed'  // Lower times are better
+                        autorange: 'reversed',  // Lower times are better
+                        side: 'left'
                     },
-                    hovermode: 'closest'
+                    yaxis2: {
+                        title: 'Pace (seconds per mile)',
+                        autorange: 'reversed',  // Lower pace is better
+                        side: 'right',
+                        overlaying: 'y'
+                    },
+                    hovermode: 'closest',
+                    showlegend: true
                 };
                 
-                Plotly.newPlot('progress-chart-{{ pr.distance.replace("K", "k").replace(" ", "-") }}', [trace], layout);
+                Plotly.newPlot('progress-chart-{{ pr.distance.replace("K", "k").replace(" ", "-") }}', 
+                              [timeTrace, paceTrace], layout);
             }
         })
         .catch(error => console.error('Error fetching progress data:', error));

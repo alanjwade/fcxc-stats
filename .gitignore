@@ -24,6 +24,10 @@ wheels/
 *.egg
 MANIFEST
 
+# Scraper source pages (HTML files from MileSplit)
+scraper/pages/
+*.html
+
 # Virtual environments
 venv/
 ENV/

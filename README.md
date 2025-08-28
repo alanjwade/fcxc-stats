@@ -62,18 +62,38 @@ fcxc_stats/
 └── DEPLOYMENT.md     # Detailed deployment guide
 ```
 
-## ⚠️ **Current Status: MileSplit Integration**
+## ✅ **Scraper Usage**
 
-The automatic MileSplit scraping is currently experiencing issues due to JavaScript-rendered content on MileSplit.com. The system is fully functional for data storage, analysis, and web interface - only the automatic scraping component needs enhancement.
+The MileSplit scraper now includes intelligent duplicate prevention and flexible operation modes:
 
-**Current Workaround Options:**
-1. **Manual CSV Import**: Export results from MileSplit and import via CSV
-2. **Direct Database Entry**: Use the database schema to manually insert results
-3. **API Integration**: Enhance scraper with Selenium for JavaScript rendering (planned)
+### Basic Scraping (Prevents Duplicates)
+```bash
+# Standard run - skips existing data, adds only new results
+docker-compose --profile scraper run --rm scraper
+```
 
-**Everything else works perfectly:**
-✅ Database schema and storage  
-✅ Web dashboard with statistics  
+### Full Database Refresh
+```bash
+# Clear database and reload all data
+docker-compose --profile scraper run --rm scraper python scraper.py --clear-db
+```
+
+### Custom Configuration
+```bash
+# Use custom configuration file
+docker-compose --profile scraper run --rm scraper python scraper.py --config /path/to/races.yaml
+```
+
+### Scraper Features
+✅ **Smart Duplicate Prevention**: Automatically skips existing results  
+✅ **Meet/Race Separation**: Clean organization with meet names and race names  
+✅ **Incremental Updates**: Add new races without affecting existing data  
+✅ **Flexible Configuration**: YAML-based race definitions  
+✅ **Robust Error Handling**: Continues processing even if individual races fail  
+
+**Everything works perfectly:**
+✅ Database schema with fractional seconds support  
+✅ Web dashboard with pace calculations  
 ✅ CSV export functionality  
 ✅ Team and athlete analytics  
 ✅ Docker containerization  
