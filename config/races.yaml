@@ -14,6 +14,51 @@
 # Use either 'url' for online scraping or 'file' for local HTML files
 
 races:
+  # John Martin XC Invitational 2025 - August 30, 2025
+  - meet_name: "John Martin XC Invitational 2025"
+    race_name: "High School Boys JV"
+    file: "pages/John Martin XC Invitational 2025 - High School Boys JV 5000 Meter (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "boys"
+    venue: "Fort Collins High School"
+    date: "2025-08-30"
+    season: "2025"
+    algorithm: john_martin
+
+  - meet_name: "John Martin XC Invitational 2025"
+    race_name: "High School Boys Varsity"
+    file: "pages/John Martin XC Invitational 2025 - High School Boys Varsity 5000 Me (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Fort Collins High School"
+    date: "2025-08-30"
+    season: "2025"
+    algorithm: john_martin
+
+  - meet_name: "John Martin XC Invitational 2025"
+    race_name: "High School Girls JV"
+    file: "pages/John Martin XC Invitational 2025 - High School Girls JV 5000 Meter (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "girls"
+    venue: "Fort Collins High School"
+    date: "2025-08-30"
+    season: "2025"
+    algorithm: john_martin
+
+  - meet_name: "John Martin XC Invitational 2025"
+    race_name: "High School Girls Varsity"
+    file: "pages/John Martin XC Invitational 2025 - High School Girls Varsity 5000 M (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Fort Collins High School"
+    date: "2025-08-30"
+    season: "2025"
+    algorithm: john_martin
+
   # Rocky Mountain Lobo Invitational 2025 - August 23, 2025
   - meet_name: "Rocky Mountain Lobo Invitational 2025"
     race_name: "Varsity Boys"
@@ -24,6 +69,7 @@ races:
     venue: "Rocky Mountain High School, Fort Collins CO"
     date: "2025-08-23"
     season: "2025"
+    algorithm: default
 
   - meet_name: "Rocky Mountain Lobo Invitational 2025"
     race_name: "Varsity Girls"
@@ -34,6 +80,7 @@ races:
     venue: "Rocky Mountain High School, Fort Collins CO"
     date: "2025-08-23"
     season: "2025"
+    algorithm: default
 
   - meet_name: "Rocky Mountain Lobo Invitational 2025"
     race_name: "JV Boys"
@@ -44,6 +91,7 @@ races:
     venue: "Rocky Mountain High School, Fort Collins CO"
     date: "2025-08-23"
     season: "2025"
+    algorithm: default
 
   - meet_name: "Rocky Mountain Lobo Invitational 2025"
     race_name: "JV Girls"
@@ -54,6 +102,7 @@ races:
     venue: "Rocky Mountain High School, Fort Collins CO"
     date: "2025-08-23"
     season: "2025"
+    algorithm: default
 
   # Vista Nation XC 2-Mile Invitational 2025 - August 23, 2025
   - meet_name: "Vista Nation XC 2-Mile Invitational 2025"
@@ -65,6 +114,7 @@ races:
     venue: "Mountain Vista High School, Highlands Ranch CO"
     date: "2025-08-23"
     season: "2025"
+    algorithm: default
 
   - meet_name: "Vista Nation XC 2-Mile Invitational 2025"
     race_name: "Girls Varsity"
@@ -75,6 +125,7 @@ races:
     venue: "Mountain Vista High School, Highlands Ranch CO"
     date: "2025-08-23"
     season: "2025"
+    algorithm: default
 
   - meet_name: "Vista Nation XC 2-Mile Invitational 2025"
     race_name: "Boys Freshman/Sophomore"
@@ -85,6 +136,7 @@ races:
     venue: "Mountain Vista High School, Highlands Ranch CO"
     date: "2025-08-23"
     season: "2025"
+    algorithm: default
 
   - meet_name: "Vista Nation XC 2-Mile Invitational 2025"
     race_name: "Girls Freshman/Sophomore"
@@ -95,6 +147,7 @@ races:
     venue: "Mountain Vista High School, Highlands Ranch CO"
     date: "2025-08-23"
     season: "2025"
+    algorithm: default
     
 
 # Team information

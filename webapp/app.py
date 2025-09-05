@@ -309,20 +309,40 @@ def team_stats():
             # Process data by distance
             boys_by_distance = {}
             girls_by_distance = {}
-            
             for stat in boys_stats:
                 if stat.distance not in boys_by_distance:
                     boys_by_distance[stat.distance] = []
                 boys_by_distance[stat.distance].append(stat)
-            
             for stat in girls_stats:
                 if stat.distance not in girls_by_distance:
                     girls_by_distance[stat.distance] = []
                 girls_by_distance[stat.distance].append(stat)
-            
+
+            # Normalize keys for ordering
+            def normalize_distance(d):
+                d_lower = d.lower().replace(' ', '')
+                if d_lower in ['5k', '5km', '5000m']:
+                    return '5k'
+                if d_lower in ['2m', '2mi', '2mile', '2 miles', '2mi.', '2mile.']:
+                    return '2M'
+                return d
+
+            def ordered_distances(dist_dict):
+                # Map normalized keys to original keys
+                norm_map = {normalize_distance(d): d for d in dist_dict.keys()}
+                order = ['5k', '2M']
+                ordered = [norm_map[o] for o in order if o in norm_map]
+                ordered += sorted([d for d in dist_dict.keys() if normalize_distance(d) not in order])
+                return ordered
+
+            boys_distances = ordered_distances(boys_by_distance)
+            girls_distances = ordered_distances(girls_by_distance)
+
             return render_template('team_stats.html',
                                  boys_by_distance=boys_by_distance,
                                  girls_by_distance=girls_by_distance,
+                                 boys_distances=boys_distances,
+                                 girls_distances=girls_distances,
                                  format_time=format_time)
     
     except Exception as e:
@@ -390,6 +410,7 @@ def athlete_stats(athlete_id):
             
             return render_template('athlete_stats.html',
                                  athlete=athlete,
+                                 athlete_id=athlete_id,
                                  results=results,
                                  prs=prs,
                                  varsity_races=varsity_races,
@@ -435,34 +456,81 @@ def athlete_progress_api(athlete_id, distance):
     """API endpoint for athlete progress data."""
     try:
         with get_db_connection() as conn:
-            progress_query = text("""
-                SELECT 
-                    res.time_seconds,
-                    m.meet_date,
-                    m.name as meet_name
-                FROM results res
-                JOIN races r ON res.race_id = r.id
-                JOIN meets m ON r.meet_id = m.id
-                WHERE res.athlete_id = :athlete_id
-                AND r.distance = :distance
-                ORDER BY m.meet_date ASC
-            """)
-            
-            progress = conn.execute(progress_query, {
-                'athlete_id': athlete_id,
-                'distance': distance
-            }).fetchall()
-            
-            data = [{
-                'date': str(p.meet_date),
-                'time': float(p.time_seconds),
-                'pace': calculate_pace(float(p.time_seconds), distance),
-                'pace_seconds': float(p.time_seconds) / distance_to_miles(distance),
-                'meet': p.meet_name,
-                'formatted_time': format_time(float(p.time_seconds))
-            } for p in progress]
-            
-            return jsonify(data)
+            if distance == 'all':
+                # Return data for all races
+                progress_query = text("""
+                    SELECT 
+                        res.time_seconds,
+                        r.distance,
+                        m.meet_date,
+                        m.name as meet_name
+                    FROM results res
+                    JOIN races r ON res.race_id = r.id
+                    JOIN meets m ON r.meet_id = m.id
+                    WHERE res.athlete_id = :athlete_id
+                    ORDER BY m.meet_date ASC
+                """)
+                
+                progress = conn.execute(progress_query, {
+                    'athlete_id': athlete_id
+                }).fetchall()
+                
+                data = []
+                for p in progress:
+                    time_seconds = float(p.time_seconds)
+                    race_distance = p.distance
+                    pace_seconds = time_seconds / distance_to_miles(race_distance)
+                    # 5k in miles
+                    five_k_miles = 3.10686
+                    if abs(distance_to_miles(race_distance) - five_k_miles) < 0.01:
+                        five_k_time = time_seconds
+                    else:
+                        five_k_time = pace_seconds * five_k_miles
+                    data.append({
+                        'date': str(p.meet_date),
+                        'time': time_seconds,
+                        'pace': calculate_pace(time_seconds, race_distance),
+                        'pace_seconds': pace_seconds,
+                        'meet': p.meet_name,
+                        'distance': race_distance,
+                        'formatted_time': format_time(time_seconds),
+                        'five_k_time': five_k_time,
+                        'formatted_five_k_time': format_time(five_k_time)
+                    })
+                
+                return jsonify(data)
+            else:
+                # Original single distance logic
+                progress_query = text("""
+                    SELECT 
+                        res.time_seconds,
+                        m.meet_date,
+                        m.name as meet_name
+                    FROM results res
+                    JOIN races r ON res.race_id = r.id
+                    JOIN meets m ON r.meet_id = m.id
+                    WHERE res.athlete_id = :athlete_id
+                    AND r.distance = :distance
+                    ORDER BY m.meet_date ASC
+                """)
+                
+                progress = conn.execute(progress_query, {
+                    'athlete_id': athlete_id,
+                    'distance': distance
+                }).fetchall()
+                
+                data = [{
+                    'date': str(p.meet_date),
+                    'time': float(p.time_seconds),
+                    'pace': calculate_pace(float(p.time_seconds), distance),
+                    'pace_seconds': float(p.time_seconds) / distance_to_miles(distance),
+                    'meet': p.meet_name,
+                    'formatted_time': format_time(float(p.time_seconds)),
+                    'five_k_time': float(p.time_seconds),
+                    'formatted_five_k_time': format_time(float(p.time_seconds))
+                } for p in progress]
+                
+                return jsonify(data)
     
     except Exception as e:
         logger.error(f"Error getting athlete progress: {e}")

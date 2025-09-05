@@ -142,101 +142,168 @@
 </div>
 
 <!-- Progress Charts for each distance -->
-{% if prs %}
 <div class="row">
     <div class="col-12">
         <h3><i class="fas fa-chart-line text-success"></i> Progress Over Time</h3>
-        {% for pr in prs %}
         <div class="card mb-3">
             <div class="card-header">
-                <h5>{{ pr.distance }} Progress</h5>
+                <h5>All Races Progress</h5>
             </div>
             <div class="card-body">
-                <div id="progress-chart-{{ pr.distance.replace('K', 'k').replace(' ', '-') }}" style="height: 300px;"></div>
+                <div id="progress-chart-all" style="height: 300px;"></div>
             </div>
         </div>
-        {% endfor %}
     </div>
 </div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
-{% if prs %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    {% for pr in prs %}
-    // Fetch progress data for {{ pr.distance }}
-    fetch('/api/athlete/{{ athlete.id }}/progress/{{ pr.distance }}')
-        .then(response => response.json())
+    // Fetch progress data for all races
+    console.log('DEBUG: Chart version 2.0 - Using athlete_id:', '{{ athlete_id }}');
+    console.log('Fetching data from: /api/athlete/{{ athlete_id }}/progress/all');
+    fetch('/api/athlete/{{ athlete_id }}/progress/all')
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('Received data:', data);
             if (data.length > 0) {
                 const dates = data.map(d => d.date);
-                const times = data.map(d => d.time);
+                const fivek_times = data.map(d => d.five_k_time);
+                const formatted_fivek_times = data.map(d => d.formatted_five_k_time);
                 const paces = data.map(d => d.pace_seconds);
                 const meets = data.map(d => d.meet);
-                const formatted_times = data.map(d => d.formatted_time);
                 const formatted_paces = data.map(d => d.pace);
-                
-                // Time trace
-                const timeTrace = {
+
+                console.log('DEBUG - 5K times:', fivek_times);
+                console.log('DEBUG - Paces:', paces);
+                console.log('DEBUG - Dates:', dates);
+                console.log('DEBUG - 5K time range:', Math.min(...fivek_times), 'to', Math.max(...fivek_times));
+                console.log('DEBUG - Pace range:', Math.min(...paces), 'to', Math.max(...paces));
+
+                // Helper function to format seconds to MM:SS
+                function formatTime(seconds) {
+                    const minutes = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return minutes + ':' + (secs < 10 ? '0' : '') + secs;
+                }
+
+                // 5k Time trace (primary y-axis)
+                const fivekTrace = {
                     x: dates,
-                    y: times,
+                    y: fivek_times,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    line: {color: '#007bff'},
-                    marker: {size: 8},
-                    name: 'Time',
+                    line: {color: '#007bff', width: 4},
+                    marker: {size: 12, color: '#007bff'},
+                    name: '5k Time',
                     text: meets,
-                    hovertemplate: '<b>%{text}</b><br>Date: %{x}<br>Time: ' + 
-                                   formatted_times.map((t, i) => t).join('') + 
-                                   '<extra></extra>'
+                    hovertemplate: '<b>%{text}</b><br>Date: %{x}<br>5k Time: %{customdata}<extra></extra>',
+                    customdata: fivek_times.map(formatTime),
+                    yaxis: 'y'
                 };
-                
-                // Pace trace (on secondary y-axis)
+
+                // Pace trace (secondary y-axis)
                 const paceTrace = {
                     x: dates,
                     y: paces,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    line: {color: '#28a745'},
-                    marker: {size: 8},
-                    name: 'Pace',
-                    yaxis: 'y2',
+                    line: {color: '#28a745', width: 4, dash: 'dash'},
+                    marker: {size: 12, color: '#28a745', symbol: 'square'},
+                    name: 'Pace per Mile',
                     text: meets,
-                    hovertemplate: '<b>%{text}</b><br>Date: %{x}<br>Pace: ' + 
-                                   formatted_paces.map((p, i) => p + '/mile').join('') + 
-                                   '<extra></extra>'
+                    hovertemplate: '<b>%{text}</b><br>Date: %{x}<br>Pace: %{customdata}/mile<extra></extra>',
+                    customdata: paces.map(formatTime),
+                    yaxis: 'y2'
                 };
-                
+
+                console.log('DEBUG - fivekTrace:', fivekTrace);
+                console.log('DEBUG - paceTrace:', paceTrace);
+
                 const layout = {
-                    title: '{{ pr.distance }} Performance Over Time',
+                    title: {
+                        text: 'All Races Performance Over Time',
+                        font: {size: 16}
+                    },
                     xaxis: {
                         title: 'Date',
                         type: 'date'
                     },
                     yaxis: {
-                        title: 'Time (seconds)',
-                        autorange: 'reversed',  // Lower times are better
-                        side: 'left'
+                        title: '5k Time',
+                        titlefont: {color: '#007bff'},
+                        tickfont: {color: '#007bff'},
+                        side: 'left',
+                        range: [Math.min(...fivek_times) * 0.98, Math.max(...fivek_times) * 1.02],
+                        tickmode: 'array',
+                        tickvals: [],
+                        ticktext: []
                     },
                     yaxis2: {
-                        title: 'Pace (seconds per mile)',
-                        autorange: 'reversed',  // Lower pace is better
+                        title: 'Pace per Mile',
+                        titlefont: {color: '#28a745'},
+                        tickfont: {color: '#28a745'},
                         side: 'right',
-                        overlaying: 'y'
+                        overlaying: 'y',
+                        // Offset pace axis up by 10% from baseline
+                        range: [Math.min(...paces) * 0.9, Math.max(...paces) * 1.1],
+                        tickmode: 'array',
+                        tickvals: [],
+                        ticktext: []
                     },
-                    hovermode: 'closest',
-                    showlegend: true
+                    hovermode: 'x unified',
+                    showlegend: true,
+                    legend: {
+                        x: 0.02,
+                        y: 0.98,
+                        bgcolor: 'rgba(255,255,255,0.8)',
+                        bordercolor: 'rgba(0,0,0,0.2)',
+                        borderwidth: 1
+                    }
                 };
-                
-                Plotly.newPlot('progress-chart-{{ pr.distance.replace("K", "k").replace(" ", "-") }}', 
-                              [timeTrace, paceTrace], layout);
+
+                // Generate MM:SS tick labels for 5k times (y-axis)
+                const minFiveK = Math.min(...fivek_times) * 0.98;
+                const maxFiveK = Math.max(...fivek_times) * 1.02;
+                const fiveKStep = (maxFiveK - minFiveK) / 6; // About 6 ticks
+                for (let i = 0; i <= 6; i++) {
+                    const val = minFiveK + (i * fiveKStep);
+                    layout.yaxis.tickvals.push(val);
+                    layout.yaxis.ticktext.push(formatTime(val));
+                }
+
+                // Generate MM:SS tick labels for pace (y2-axis)  
+                const minPace = Math.min(...paces) * 0.9;
+                const maxPace = Math.max(...paces) * 1.1;
+                const paceStep = (maxPace - minPace) / 6; // About 6 ticks
+                for (let i = 0; i <= 6; i++) {
+                    const val = minPace + (i * paceStep);
+                    layout.yaxis2.tickvals.push(val);
+                    layout.yaxis2.ticktext.push(formatTime(val));
+                }
+
+                console.log('DEBUG - Layout:', layout);
+
+                console.log('DEBUG - Creating chart with traces...');
+
+                Plotly.newPlot('progress-chart-all', [fivekTrace, paceTrace], layout)
+                    .then(() => {
+                        console.log('Chart created successfully');
+                    })
+                    .catch(error => {
+                        console.error('Error creating chart:', error);
+                    });
+            } else {
+                console.log('No data received for chart');
             }
         })
-        .catch(error => console.error('Error fetching progress data:', error));
-    {% endfor %}
+        .catch(error => {
+            console.error('Error fetching progress data:', error);
+        });
 });
 </script>
-{% endif %}
 {% endblock %}

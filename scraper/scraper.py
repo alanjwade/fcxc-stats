@@ -38,6 +38,7 @@ class RaceConfig:
     season: str
     url: Optional[str] = None
     file: Optional[str] = None
+    algorithm: Optional[str] = 'default'
 
 @dataclass
 class Athlete:
@@ -107,116 +108,169 @@ class MileSplitScraper:
     def parse_time_to_seconds(self, time_str: str) -> Optional[float]:
         """Parse time string (MM:SS.ss, MM:SS, or extended formats) to total seconds with fractional support."""
         time_str = time_str.strip()
-        
-        # Handle different time formats seen in MileSplit (order matters!)
         patterns = [
-            r'(\d{1,2}):(\d{2}):(\d{2})\.(\d{2})', # H:MM:SS.ss (for very long times) - CHECK FIRST
-            r'(\d{1,2}):(\d{2}):(\d{2})',        # H:MM:SS - CHECK SECOND  
+            r'(\d{1,2}):(\d{2}):(\d{2})\.(\d{2})', # H:MM:SS.ss (for very long times)
+            r'(\d{1,2}):(\d{2}):(\d{2})',        # MM:SS:ss (hundredths)
             r'(\d{1,2}):(\d{2})\.(\d{2})',      # MM:SS.ss
             r'(\d{1,2}):(\d{2})',              # MM:SS
             r'(\d{3,4})\.(\d{2})'              # SSS.ss or SSSS.ss (seconds only)
         ]
-        
         for i, pattern in enumerate(patterns):
             match = re.match(pattern, time_str)
             if match:
                 groups = match.groups()
-                
                 if i == 0:  # H:MM:SS.ss
                     hours, minutes, seconds, hundredths = groups
-                    return float(int(hours) * 3600 + int(minutes) * 60 + int(seconds)) + float(int(hundredths)) / 100.0
-                elif i == 1:  # H:MM:SS
-                    hours, minutes, seconds = groups
-                    return float(int(hours) * 3600 + int(minutes) * 60 + int(seconds))
+                    total = float(int(hours) * 3600 + int(minutes) * 60 + int(seconds)) + float(int(hundredths)) / 100.0
+                elif i == 1:  # MM:SS:ss (hundredths)
+                    minutes, seconds, hundredths = groups
+                    total = float(int(minutes) * 60 + int(seconds)) + float(int(hundredths)) / 100.0
                 elif i == 2:  # MM:SS.ss
                     minutes, seconds, hundredths = groups
-                    return float(int(minutes) * 60 + int(seconds)) + float(int(hundredths)) / 100.0
+                    total = float(int(minutes) * 60 + int(seconds)) + float(int(hundredths)) / 100.0
                 elif i == 3:  # MM:SS
                     minutes, seconds = groups
-                    return float(int(minutes) * 60 + int(seconds))
+                    total = float(int(minutes) * 60 + int(seconds))
                 elif i == 4:  # SSS.ss or SSSS.ss
                     seconds, hundredths = groups
-                    return float(int(seconds)) + float(int(hundredths)) / 100.0
-        
+                    total = float(int(seconds)) + float(int(hundredths)) / 100.0
+                # Sanity check: reject times over 1 hour (3600 seconds)
+                if total > 3600:
+                    print(f"ERROR: Parsed time exceeds sanity threshold: {total} seconds from '{time_str}'")
+                    logger.error(f"Sanity check failed: time {total} from '{time_str}'")
+                    sys.exit(1)
+                return total
         logger.warning(f"Could not parse time format: {time_str}")
         return None
 
-    def scrape_race_results(self, source: str, is_file: bool = False) -> List[Result]:
-        """Scrape race results from MileSplit URL or local HTML file."""
+    def scrape_john_martin_format(self, source: str, is_file: bool = False, gender: str = 'unknown') -> List[Result]:
+        """Scrape race results using the John Martin format (custom algorithm)."""
+        import re
         try:
             if is_file:
-                # Read from local file
                 if not os.path.exists(source):
-                    logger.error(f"Local file not found: {source}")
+                    logger.error(f"File not found: {source}")
                     return []
-                
                 with open(source, 'r', encoding='utf-8') as f:
                     html_content = f.read()
                 soup = BeautifulSoup(html_content, 'html.parser')
             else:
-                # Fetch from URL
                 response = self.session.get(source, timeout=30)
                 response.raise_for_status()
                 soup = BeautifulSoup(response.content, 'html.parser')
-            
+            table = soup.find('table')
+            if not table:
+                logger.warning("No table found in John Martin format file.")
+                return []
             results = []
-            
-            # First try to find results in a <pre> tag (MileSplit raw format)
+            time_pattern = re.compile(r'^(\d{1,2}:\d{2}(?:\.\d{2})?|\d{1,2}:\d{2}:\d{2}(?:\.\d{2})?|\d{2,4}\.\d{2})$')
+            rows = table.find_all('tr')
+            # Skip header row if present
+            if rows and len(rows) > 1:
+                rows = rows[1:]
+            for row in rows:
+                cells = row.find_all('td')
+                if len(cells) != 4:
+                    continue
+                place_val = cells[0].get_text(strip=True)
+                name_val = cells[1].get_text(strip=True)
+                school_val = cells[2].get_text(strip=True)
+                time_val = cells[3].get_text(strip=True)
+                if not time_pattern.match(time_val):
+                    logger.error(f"Invalid time format found in row: place='{place_val}', name='{name_val}', school='{school_val}', time='{time_val}'")
+                    print(f"ERROR: Invalid time format in John Martin file: place='{place_val}', name='{name_val}', school='{school_val}', time='{time_val}'")
+                    sys.exit(1)
+                try:
+                    place = int(place_val)
+                    name = name_val
+                    school = school_val
+                    time_seconds = self.parse_time_to_seconds(time_val)
+                    if time_seconds is None:
+                        print(f"ERROR: Could not parse time format: place='{place_val}', name='{name_val}', school='{school_val}', time='{time_val}'")
+                        logger.error(f"Could not parse time format: place='{place_val}', name='{name_val}', school='{school_val}', time='{time_val}'")
+                        sys.exit(1)
+                    name_parts = name.split()
+                    first_name = name_parts[0]
+                    last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+                    first_name = self.normalize_name(first_name)
+                    last_name = self.normalize_name(last_name)
+                    athlete = Athlete(
+                        first_name=first_name,
+                        last_name=last_name,
+                        gender=self.map_gender_for_db(gender),
+                        school=school
+                    )
+                    result = Result(
+                        athlete=athlete,
+                        time_seconds=time_seconds,
+                        place=place
+                    )
+                    results.append(result)
+                except Exception as e:
+                    print(f"ERROR: Exception parsing row: place='{place_val}', name='{name_val}', school='{school_val}', time='{time_val}' - {e}")
+                    logger.error(f"Error parsing John Martin row: place='{place_val}', name='{name_val}', school='{school_val}', time='{time_val}' - {e}")
+                    sys.exit(1)
+            logger.info(f"Parsed {len(results)} results from John Martin format.")
+            return results
+        except Exception as e:
+            logger.error(f"Error scraping John Martin format: {e}")
+            raise
+
+    def scrape_race_results(self, source: str, is_file: bool = False, algorithm: str = 'default', gender: str = 'unknown') -> List[Result]:
+        """Scrape race results using the selected algorithm."""
+        if algorithm == 'john_martin':
+            return self.scrape_john_martin_format(source, is_file, gender=gender)
+        # Default algorithm
+        try:
+            if is_file:
+                if not os.path.exists(source):
+                    logger.error(f"File not found: {source}")
+                    return []
+                with open(source, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+                soup = BeautifulSoup(html_content, 'html.parser')
+            else:
+                response = self.session.get(source, timeout=30)
+                response.raise_for_status()
+                soup = BeautifulSoup(response.content, 'html.parser')
+            results = []
             pre_tag = soup.find('pre')
             if pre_tag:
                 results = self.parse_pre_formatted_results(pre_tag.get_text())
                 if results:
-                    logger.info(f"Parsed {len(results)} results from pre-formatted text in {source}")
                     return results
-            
-            # Fall back to table parsing
-            # Find the results table - MileSplit uses different table structures
-            # Look for tables with class 'table' or common MileSplit table classes
             possible_tables = soup.find_all('table')
-            
             results_table = None
             for table in possible_tables:
-                # Check if this table contains race results by looking for time patterns
                 table_text = table.get_text()
-                if re.search(r'\d{1,2}:\d{2}', table_text):  # Look for time patterns like MM:SS
+                if re.search(r'\d{1,2}:\d{2}', table_text):
                     results_table = table
                     break
-            
             if not results_table:
-                # If no table found, try to parse from the raw text content
-                # MileSplit sometimes displays results in markdown-like format
                 return self.parse_results_from_text(soup.get_text())
-            
-            # Parse table rows
             rows = results_table.find_all('tr')
             header_processed = False
-            
             for row in rows:
                 cells = row.find_all(['td', 'th'])
                 if len(cells) < 4:
                     continue
-                
-                # Skip header rows
                 if not header_processed and any('place' in cell.get_text().lower() or 
                                               'name' in cell.get_text().lower() or
                                               'time' in cell.get_text().lower() 
                                               for cell in cells):
                     header_processed = True
                     continue
-                
                 try:
-                    # Parse race result from table row
                     result = self.parse_table_row(cells)
+                    # Normalize names for default algorithm
                     if result:
+                        result.athlete.first_name = self.normalize_name(result.athlete.first_name)
+                        result.athlete.last_name = self.normalize_name(result.athlete.last_name)
                         results.append(result)
-                        
                 except Exception as e:
-                    logger.warning(f"Error parsing table row: {e}")
-                    continue
-            
+                    logger.warning(f"Error parsing row: {e}")
             logger.info(f"Scraped {len(results)} results from {source}")
             return results
-            
         except requests.RequestException as e:
             logger.error(f"Error fetching {source}: {e}")
             return []
@@ -720,6 +774,10 @@ class MileSplitScraper:
             logger.error(f"Error storing race results: {e}")
             raise
 
+    def normalize_name(self, name: str) -> str:
+        """Capitalize first letter, lower case the rest for each word in a name."""
+        return ' '.join([w.capitalize() for w in name.split()])
+
 def main():
     """Main function to run the scraper."""
     parser = argparse.ArgumentParser(description='Cross Country Statistics Scraper')
@@ -770,10 +828,10 @@ def main():
                 else:
                     # File path is relative to config file
                     file_path = os.path.join(os.path.dirname(config_path), race_config.file)
-                results = scraper.scrape_race_results(file_path, is_file=True)
+                results = scraper.scrape_race_results(file_path, is_file=True, algorithm=getattr(race_config, 'algorithm', 'default'), gender=getattr(race_config, 'gender', 'unknown'))
             elif race_config.url:
                 # Use URL
-                results = scraper.scrape_race_results(race_config.url, is_file=False)
+                results = scraper.scrape_race_results(race_config.url, is_file=False, algorithm=getattr(race_config, 'algorithm', 'default'), gender=getattr(race_config, 'gender', 'unknown'))
             else:
                 logger.error(f"No source (URL or file) specified for race: {race_config.race_name}")
                 continue
