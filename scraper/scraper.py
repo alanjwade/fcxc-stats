@@ -216,10 +216,285 @@ class MileSplitScraper:
             logger.error(f"Error scraping John Martin format: {e}")
             raise
 
-    def scrape_race_results(self, source: str, is_file: bool = False, algorithm: str = 'default', gender: str = 'unknown') -> List[Result]:
+    def scrape_thornton_combined_format(self, source: str, is_file: bool = False, gender: str = 'unknown', race_config: Optional[RaceConfig] = None) -> List[Result]:
+        """Scrape race results using the Thornton combined format (custom algorithm)."""
+        import re
+        try:
+            if is_file:
+                if not os.path.exists(source):
+                    logger.error(f"File not found: {source}")
+                    return []
+                with open(source, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+                soup = BeautifulSoup(html_content, 'html.parser')
+            else:
+                response = self.session.get(source, timeout=30)
+                response.raise_for_status()
+                soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Find the pre-formatted text section
+            pre_tag = soup.find('pre')
+            if not pre_tag:
+                logger.warning("No <pre> tag found in Thornton combined format file.")
+                return []
+
+            text = pre_tag.get_text()
+            if not text:
+                logger.warning("No text content found in <pre> tag.")
+                return []
+
+            # Determine which specific race section to parse based on race_config
+            if not race_config:
+                logger.error("No race configuration provided for Thornton combined format")
+                return []
+            
+            # Map race_config to the specific race header in the file
+            race_class = race_config.race_class.lower()
+            gender_str = race_config.gender.lower()
+            
+            # Determine the target race header and gender for parsing
+            target_race_header = None
+            target_gender = None
+            
+            if race_class == "jv" and gender_str == "boys":
+                target_race_header = "JV Boys 5000 Meter Run"
+                target_gender = "M"
+            elif race_class == "jv" and gender_str == "girls":
+                target_race_header = "JV Girls 5000 Meter Run"
+                target_gender = "F"
+            elif race_class == "varsity" and gender_str == "boys":
+                target_race_header = "Varsity Boys 5000 Meter Run"
+                target_gender = "M"
+            elif race_class == "varsity" and gender_str == "girls":
+                target_race_header = "Varsity Girls 5000 Meter Run"
+                target_gender = "F"
+            else:
+                logger.error(f"Unknown race combination: {race_class} {gender_str}")
+                return []
+
+            logger.info(f"Looking for race section: {target_race_header}")
+            
+            # Find the start of this race section
+            start_pattern = re.escape(target_race_header)
+            start_match = re.search(start_pattern, text, re.IGNORECASE)
+            
+            if not start_match:
+                logger.warning(f"Could not find race section: {target_race_header}")
+                return []
+            
+            start_pos = start_match.end()
+            
+            # Find the end of this race section (next race header or team scores)
+            end_patterns = [
+                r"Team Scores",
+                r"JV (?:Boys|Girls) 5000 Meter Run",
+                r"Varsity (?:Boys|Girls) 5000 Meter Run"
+            ]
+            
+            end_pos = len(text)
+            for pattern in end_patterns:
+                end_match = re.search(pattern, text[start_pos:], re.IGNORECASE)
+                if end_match:
+                    potential_end = start_pos + end_match.start()
+                    if potential_end > start_pos:
+                        end_pos = potential_end
+                        break
+            
+            race_text = text[start_pos:end_pos]
+            logger.info(f"Extracted {len(race_text)} characters for {target_race_header}")
+            
+            # Parse this specific race section
+            results = self.parse_thornton_race_text(race_text, race_config.gender)
+            
+            logger.info(f"Parsed {len(results)} total results from Thornton combined format for {target_race_header}.")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error scraping Thornton combined format: {e}")
+            raise
+
+    def parse_thornton_race_text(self, text: str, gender: str) -> List[Result]:
+        """Parse a single race section from Thornton format text."""
+        results = []
+        lines = text.split('\n')
+        
+        logger.info(f"Parsing Thornton race text with {len(lines)} lines")
+        
+        # Find the data lines - they start after the header separator
+        in_results = False
+        header_separator_found = False
+        
+        for line_num, line in enumerate(lines):
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Look for the separator line with dashes
+            if '-' * 10 in line:  # Line with many dashes indicates start of data
+                in_results = True
+                header_separator_found = True
+                continue
+            
+            if not in_results:
+                continue
+                
+            # Stop if we hit team results
+            if "Team Scores" in line or "Total Time:" in line:
+                logger.info(f"Hit team results section at line {line_num}, stopping parse")
+                break
+                
+            # Parse data lines
+            # Format: Place Name Year School Time Points
+            # Example: "  1 Flint Hartsky         11 Laramie High School  16:42.45      1"
+            
+            # Use regex to parse the fixed-width format
+            # The format appears to be fixed-width: place(3) name(variable) grade(2) school(variable) time(8) points(variable)
+            # Since split by multiple spaces doesn't work due to truncated school names, use a different approach
+            
+            # Try to match the specific pattern where we know the time format
+            time_match = re.search(r'(\d{1,2}:\d{2}\.\d{2})', line)
+            if time_match:
+                time_str = time_match.group(1)
+                time_start = time_match.start()
+                time_end = time_match.end()
+                
+                # Everything before the time should contain: place, name, grade, school
+                before_time = line[:time_start].strip()
+                # Everything after the time should contain: points
+                after_time = line[time_end:].strip()
+                
+                # Parse the part before time - split by multiple spaces to separate name section from grade+school section
+                parts_before = re.split(r'\s{2,}', before_time)
+                if len(parts_before) >= 2:
+                    # First part: place and name
+                    place_name_part = parts_before[0].strip()
+                    place_name_match = re.match(r'^(\d+)\s+(.+)$', place_name_part)
+                    if not place_name_match:
+                        continue
+                    
+                    place = int(place_name_match.group(1))
+                    name = place_name_match.group(2).strip()
+                    
+                    # Second part: grade and school (joined if there were more parts)
+                    grade_school_part = ' '.join(parts_before[1:]).strip()
+                    grade_school_match = re.match(r'^(\d{1,2})\s+(.+)$', grade_school_part)
+                    if not grade_school_match:
+                        continue
+                        
+                    year = grade_school_match.group(1).strip()
+                    school = grade_school_match.group(2).strip()
+                    
+                    # Points from after time
+                    points = after_time
+                    
+                else:
+                    # Fall back to original regex
+                    match = re.match(r'^\s*(\d+)\s+(.+?)\s+(\d{2})\s+(.+?)\s+(\d{1,2}:\d{2}\.\d{2})\s*(\d*)\s*$', line)
+                    if match:
+                        place = int(match.group(1))
+                        name = match.group(2).strip()
+                        year = match.group(3).strip()
+                        school = match.group(4).strip()
+                        time_str = match.group(5).strip()
+                        points = match.group(6).strip() if match.group(6) else ""
+                    else:
+                        continue
+            else:
+                # No time found, skip this line
+                continue
+            
+            if place is not None:
+                try:
+                    # Variables already set by parsing logic above
+                    
+                    # Parse time to seconds
+                    time_seconds = self.parse_time_to_seconds(time_str)
+                    if time_seconds is None:
+                        logger.warning(f"Could not parse time: {time_str} in line: {line}")
+                        continue
+                    
+                    # Parse name into first and last
+                    name_parts = name.split()
+                    if len(name_parts) >= 2:
+                        first_name = name_parts[0]
+                        last_name = ' '.join(name_parts[1:])
+                    else:
+                        first_name = name
+                        last_name = ''
+                    
+                    first_name = self.normalize_name(first_name)
+                    last_name = self.normalize_name(last_name)
+                    
+                    # Fix truncated school names for Thornton format
+                    school = self.fix_thornton_school_name(school)
+                    
+                    athlete = Athlete(
+                        first_name=first_name,
+                        last_name=last_name,
+                        gender=self.map_gender_for_db(gender),
+                        school=school
+                    )
+                    
+                    result = Result(
+                        athlete=athlete,
+                        time_seconds=time_seconds,
+                        place=place
+                    )
+                    
+                    results.append(result)
+                    logger.debug(f"Parsed: {place}. {first_name} {last_name} - {school} - {time_str}")
+                    
+                except Exception as e:
+                    logger.warning(f"Error parsing Thornton line '{line}': {e}")
+                    continue
+            else:
+                # Log lines that don't match for debugging
+                if line and not line.startswith('=') and len(line) > 10:
+                    logger.debug(f"Line didn't match pattern: '{line}'")
+        
+        if not header_separator_found:
+            logger.warning("No header separator found in race text")
+        
+        # Validate that the highest place number matches the total number of results
+        if results:
+            places = [result.place for result in results if result.place is not None]
+            if places:
+                max_place = max(places)
+                total_results = len(results)
+                if max_place != total_results:
+                    logger.warning(f"Place number validation failed: highest place is {max_place} but total results is {total_results}. Some results may be missing.")
+                else:
+                    logger.info(f"Place number validation passed: {max_place} places match {total_results} total results")
+            
+        logger.info(f"Parsed {len(results)} results from Thornton race text")
+        return results
+
+    def fix_thornton_school_name(self, school_name: str) -> str:
+        """Fix truncated school names specifically from Thornton format parsing."""
+        # Mapping of truncated names to full names found in Thornton results
+        school_mappings = {
+            'Fort Collins High Sc': 'Fort Collins High School',
+            'Fossil Ridge High Sc': 'Fossil Ridge High School', 
+            'Rocky Mountain High': 'Rocky Mountain High School',
+            'Denver East High Sch': 'Denver East High School',
+            'Clear Creek High Sch': 'Clear Creek High School',
+            'Fort Lupton High Sch': 'Fort Lupton High School',
+            'Westminster High Sch': 'Westminster High School',
+            'Wheat Ridge High Sch': 'Wheat Ridge High School',
+            'Cheyenne Central Hig': 'Cheyenne Central High School',
+            'Cheyenne East High S': 'Cheyenne East High School',
+            'Prospect Ridge Acade': 'Prospect Ridge Academy'
+        }
+        
+        # Return the corrected name if found in mapping, otherwise return original
+        return school_mappings.get(school_name, school_name)
+
+    def scrape_race_results(self, source: str, is_file: bool = False, algorithm: str = 'default', gender: str = 'unknown', race_config: Optional[RaceConfig] = None) -> List[Result]:
         """Scrape race results using the selected algorithm."""
         if algorithm == 'john_martin':
             return self.scrape_john_martin_format(source, is_file, gender=gender)
+        elif algorithm == 'thornton_combined':
+            return self.scrape_thornton_combined_format(source, is_file, gender=gender, race_config=race_config)
         # Default algorithm
         try:
             if is_file:
@@ -350,6 +625,17 @@ class MileSplitScraper:
                 results.append(result)
                 logger.debug(f"Parsed: {place}. {first_name} {last_name} ({gender_str}) - {time_str}")
         
+        # Validate that the highest place number matches the total number of results
+        if results:
+            places = [result.place for result in results if result.place is not None]
+            if places:
+                max_place = max(places)
+                total_results = len(results)
+                if max_place != total_results:
+                    logger.warning(f"Place number validation failed: highest place is {max_place} but total results is {total_results}. Some results may be missing.")
+                else:
+                    logger.info(f"Place number validation passed: {max_place} places match {total_results} total results")
+        
         logger.info(f"Parsed {len(results)} results from pre-formatted text")
         return results
 
@@ -471,6 +757,17 @@ class MileSplitScraper:
                 except (ValueError, IndexError) as e:
                     logger.warning(f"Error parsing line: {line[:100]}... - {e}")
                     continue
+        
+        # Validate that the highest place number matches the total number of results
+        if results:
+            places = [result.place for result in results if result.place is not None]
+            if places:
+                max_place = max(places)
+                total_results = len(results)
+                if max_place != total_results:
+                    logger.warning(f"Place number validation failed: highest place is {max_place} but total results is {total_results}. Some results may be missing.")
+                else:
+                    logger.info(f"Place number validation passed: {max_place} places match {total_results} total results")
         
         logger.info(f"Checked {lines_checked} lines, found {matches_found} potential matches, parsed {len(results)} results from text content")
         return results
@@ -828,10 +1125,10 @@ def main():
                 else:
                     # File path is relative to config file
                     file_path = os.path.join(os.path.dirname(config_path), race_config.file)
-                results = scraper.scrape_race_results(file_path, is_file=True, algorithm=getattr(race_config, 'algorithm', 'default'), gender=getattr(race_config, 'gender', 'unknown'))
+                results = scraper.scrape_race_results(file_path, is_file=True, algorithm=getattr(race_config, 'algorithm', 'default'), gender=getattr(race_config, 'gender', 'unknown'), race_config=race_config)
             elif race_config.url:
                 # Use URL
-                results = scraper.scrape_race_results(race_config.url, is_file=False, algorithm=getattr(race_config, 'algorithm', 'default'), gender=getattr(race_config, 'gender', 'unknown'))
+                results = scraper.scrape_race_results(race_config.url, is_file=False, algorithm=getattr(race_config, 'algorithm', 'default'), gender=getattr(race_config, 'gender', 'unknown'), race_config=race_config)
             else:
                 logger.error(f"No source (URL or file) specified for race: {race_config.race_name}")
                 continue
