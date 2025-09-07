@@ -483,7 +483,10 @@ class MileSplitScraper:
             'Wheat Ridge High Sch': 'Wheat Ridge High School',
             'Cheyenne Central Hig': 'Cheyenne Central High School',
             'Cheyenne East High S': 'Cheyenne East High School',
-            'Prospect Ridge Acade': 'Prospect Ridge Academy'
+            'Prospect Ridge Acade': 'Prospect Ridge Academy',
+            'Frederick High Schoo': 'Frederick High School',
+            'Ascent Classical Aca': 'Ascent Classical Academy of Northern Colorado',
+            'Ascent Classical Academy of Nort': 'Ascent Classical Academy of Northern Colorado'
         }
         
         # Return the corrected name if found in mapping, otherwise return original

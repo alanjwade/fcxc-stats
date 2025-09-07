@@ -267,40 +267,89 @@ def team_stats():
     try:
         with get_db_connection() as conn:
             # Get best times by gender and distance for Fort Collins High School
+            # Group by name instead of athlete ID to handle duplicate athlete records
             boys_stats_query = text("""
+                WITH best_times AS (
+                    SELECT 
+                        a.first_name,
+                        a.last_name,
+                        r.distance,
+                        MIN(res.time_seconds) as best_time
+                    FROM athletes a
+                    JOIN results res ON a.id = res.athlete_id
+                    JOIN races r ON res.race_id = r.id
+                    WHERE a.gender = 'male' AND a.school = :school
+                    GROUP BY a.first_name, a.last_name, r.distance
+                ),
+                best_times_with_details AS (
+                    SELECT 
+                        bt.first_name,
+                        bt.last_name,
+                        bt.distance,
+                        bt.best_time,
+                        m.name as meet_name,
+                        r.name as race_name,
+                        m.meet_date,
+                        ROW_NUMBER() OVER (PARTITION BY bt.first_name, bt.last_name, bt.distance ORDER BY m.meet_date DESC, res.id) as rn
+                    FROM best_times bt
+                    JOIN results res ON bt.best_time = res.time_seconds
+                    JOIN athletes a ON res.athlete_id = a.id AND a.first_name = bt.first_name AND a.last_name = bt.last_name
+                    JOIN races r ON res.race_id = r.id AND r.distance = bt.distance
+                    JOIN meets m ON r.meet_id = m.id
+                )
                 SELECT 
-                    a.first_name,
-                    a.last_name,
-                    r.distance,
-                    MIN(res.time_seconds) as best_time,
-                    m.name as meet_name,
-                    r.name as race_name,
-                    m.meet_date
-                FROM athletes a
-                JOIN results res ON a.id = res.athlete_id
-                JOIN races r ON res.race_id = r.id
-                JOIN meets m ON r.meet_id = m.id
-                WHERE a.gender = 'male' AND a.school = :school
-                GROUP BY a.id, a.first_name, a.last_name, r.distance, m.name, r.name, m.meet_date
-                ORDER BY r.distance, best_time ASC
+                    first_name,
+                    last_name,
+                    distance,
+                    best_time,
+                    meet_name,
+                    race_name,
+                    meet_date
+                FROM best_times_with_details
+                WHERE rn = 1
+                ORDER BY distance, best_time ASC
             """)
             
             girls_stats_query = text("""
+                WITH best_times AS (
+                    SELECT 
+                        a.first_name,
+                        a.last_name,
+                        r.distance,
+                        MIN(res.time_seconds) as best_time
+                    FROM athletes a
+                    JOIN results res ON a.id = res.athlete_id
+                    JOIN races r ON res.race_id = r.id
+                    WHERE a.gender = 'female' AND a.school = :school
+                    GROUP BY a.first_name, a.last_name, r.distance
+                ),
+                best_times_with_details AS (
+                    SELECT 
+                        bt.first_name,
+                        bt.last_name,
+                        bt.distance,
+                        bt.best_time,
+                        m.name as meet_name,
+                        r.name as race_name,
+                        m.meet_date,
+                        ROW_NUMBER() OVER (PARTITION BY bt.first_name, bt.last_name, bt.distance ORDER BY m.meet_date DESC, res.id) as rn
+                    FROM best_times bt
+                    JOIN results res ON bt.best_time = res.time_seconds
+                    JOIN athletes a ON res.athlete_id = a.id AND a.first_name = bt.first_name AND a.last_name = bt.last_name
+                    JOIN races r ON res.race_id = r.id AND r.distance = bt.distance
+                    JOIN meets m ON r.meet_id = m.id
+                )
                 SELECT 
-                    a.first_name,
-                    a.last_name,
-                    r.distance,
-                    MIN(res.time_seconds) as best_time,
-                    m.name as meet_name,
-                    r.name as race_name,
-                    m.meet_date
-                FROM athletes a
-                JOIN results res ON a.id = res.athlete_id
-                JOIN races r ON res.race_id = r.id
-                JOIN meets m ON r.meet_id = m.id
-                WHERE a.gender = 'female' AND a.school = :school
-                GROUP BY a.id, a.first_name, a.last_name, r.distance, m.name, r.name, m.meet_date
-                ORDER BY r.distance, best_time ASC
+                    first_name,
+                    last_name,
+                    distance,
+                    best_time,
+                    meet_name,
+                    race_name,
+                    meet_date
+                FROM best_times_with_details
+                WHERE rn = 1
+                ORDER BY distance, best_time ASC
             """)
             
             boys_stats = conn.execute(boys_stats_query, {"school": SCHOOL_FILTER}).fetchall()
