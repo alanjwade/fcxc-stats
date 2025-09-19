@@ -15,61 +15,173 @@
     <div class="col-12">
         <h2><i class="fas fa-male text-primary"></i> Boys Best Times</h2>
         {% if boys_by_distance %}
+            <!-- 5K Results (Always Visible) -->
             {% for distance in boys_distances %}
-                {% set athletes = boys_by_distance[distance] %}
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h4><i class="fas fa-route"></i> {{ distance }}</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Rank</th>
-                                        <th>Name</th>
-                                        <th>Best Time</th>
-                                        <th>Pace</th>
-                                        <th>Meet</th>
-                                        <th>Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for athlete in athletes[:10] %}
-                                    <tr>
-                                        <td>
-                                            {% if loop.index == 1 %}
-                                                <span class="badge bg-warning text-dark">
-                                                    <i class="fas fa-crown"></i> {{ loop.index }}
+                {% if distance == "5K" %}
+                    {% set athletes = boys_by_distance[distance] %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4><i class="fas fa-route"></i> {{ distance }}</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>Name</th>
+                                            <th>Best Time</th>
+                                            <th>Pace</th>
+                                            <th>Meet</th>
+                                            <th>Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="boys-5k-top10">
+                                        {% for athlete in athletes[:10] %}
+                                        <tr>
+                                            <td>
+                                                {% if loop.index == 1 %}
+                                                    <span class="badge bg-warning text-dark">
+                                                        <i class="fas fa-crown"></i> {{ loop.index }}
+                                                    </span>
+                                                {% elif loop.index <= 3 %}
+                                                    <span class="badge bg-secondary">{{ loop.index }}</span>
+                                                {% else %}
+                                                    {{ loop.index }}
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('athlete_stats', athlete_id=athlete.athlete_id) }}" class="text-decoration-none">
+                                                    <strong>{{ athlete.first_name }} {{ athlete.last_name }}</strong>
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <span class="time-display text-primary">
+                                                    {{ format_time(athlete.best_time) }}
                                                 </span>
-                                            {% elif loop.index <= 3 %}
-                                                <span class="badge bg-secondary">{{ loop.index }}</span>
-                                            {% else %}
-                                                {{ loop.index }}
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <strong>{{ athlete.first_name }} {{ athlete.last_name }}</strong>
-                                        </td>
-                                        <td>
-                                            <span class="time-display text-primary">
-                                                {{ format_time(athlete.best_time) }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span class="pace-display text-success">
-                                                {{ calculate_pace(athlete.best_time, distance) }}
-                                            </span>
-                                        </td>
-                                        <td>{{ athlete.meet_name }}</td>
-                                        <td>{{ athlete.meet_date }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                                            </td>
+                                            <td>
+                                                <span class="pace-display text-success">
+                                                    {{ calculate_pace(athlete.best_time, distance) }}
+                                                </span>
+                                            </td>
+                                            <td>{{ athlete.meet_name }}</td>
+                                            <td>{{ athlete.meet_date }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tbody id="boys-5k-rest" class="collapse">
+                                        {% for athlete in athletes[10:] %}
+                                        <tr>
+                                            <td>
+                                                {% if loop.index + 10 <= 3 %}
+                                                    <span class="badge bg-secondary">{{ loop.index + 10 }}</span>
+                                                {% else %}
+                                                    {{ loop.index + 10 }}
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('athlete_stats', athlete_id=athlete.athlete_id) }}" class="text-decoration-none">
+                                                    <strong>{{ athlete.first_name }} {{ athlete.last_name }}</strong>
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <span class="time-display text-primary">
+                                                    {{ format_time(athlete.best_time) }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="pace-display text-success">
+                                                    {{ calculate_pace(athlete.best_time, distance) }}
+                                                </span>
+                                            </td>
+                                            <td>{{ athlete.meet_name }}</td>
+                                            <td>{{ athlete.meet_date }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% if athletes|length > 10 %}
+                            <div class="text-center mt-3">
+                                <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#boys-5k-rest" aria-expanded="false" id="boys-5k-toggle">
+                                    <i class="fas fa-chevron-down"></i> Show All {{ athletes|length }} Athletes
+                                </button>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
-                </div>
+                {% endif %}
+            {% endfor %}
+
+            <!-- 2M Results (Collapsible) -->
+            {% for distance in boys_distances %}
+                {% if distance != "5K" %}
+                    {% set athletes = boys_by_distance[distance] %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4>
+                                <button class="btn btn-link text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#boys-{{ distance|replace('m', '')|replace('.', '') }}" aria-expanded="false">
+                                    <i class="fas fa-route"></i> {{ distance }} 
+                                    <i class="fas fa-chevron-down float-end mt-1"></i>
+                                    <small class="text-muted ms-2">(Click to expand)</small>
+                                </button>
+                            </h4>
+                        </div>
+                        <div class="collapse" id="boys-{{ distance|replace('m', '')|replace('.', '') }}">
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Rank</th>
+                                                <th>Name</th>
+                                                <th>Best Time</th>
+                                                <th>Pace</th>
+                                                <th>Meet</th>
+                                                <th>Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for athlete in athletes[:10] %}
+                                            <tr>
+                                                <td>
+                                                    {% if loop.index == 1 %}
+                                                        <span class="badge bg-warning text-dark">
+                                                            <i class="fas fa-crown"></i> {{ loop.index }}
+                                                        </span>
+                                                    {% elif loop.index <= 3 %}
+                                                        <span class="badge bg-secondary">{{ loop.index }}</span>
+                                                    {% else %}
+                                                        {{ loop.index }}
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <a href="{{ url_for('athlete_stats', athlete_id=athlete.athlete_id) }}" class="text-decoration-none">
+                                                        <strong>{{ athlete.first_name }} {{ athlete.last_name }}</strong>
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    <span class="time-display text-primary">
+                                                        {{ format_time(athlete.best_time) }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="pace-display text-success">
+                                                        {{ calculate_pace(athlete.best_time, distance) }}
+                                                    </span>
+                                                </td>
+                                                <td>{{ athlete.meet_name }}</td>
+                                                <td>{{ athlete.meet_date }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             {% endfor %}
         {% else %}
             <div class="alert alert-info">
@@ -84,61 +196,173 @@
     <div class="col-12">
         <h2><i class="fas fa-female text-danger"></i> Girls Best Times</h2>
         {% if girls_by_distance %}
+            <!-- 5K Results (Always Visible) -->
             {% for distance in girls_distances %}
-                {% set athletes = girls_by_distance[distance] %}
-                <div class="card mb-4">
-                    <div class="card-header bg-light">
-                        <h4><i class="fas fa-route"></i> {{ distance }}</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Rank</th>
-                                        <th>Name</th>
-                                        <th>Best Time</th>
-                                        <th>Pace</th>
-                                        <th>Meet</th>
-                                        <th>Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for athlete in athletes[:10] %}
-                                    <tr>
-                                        <td>
-                                            {% if loop.index == 1 %}
-                                                <span class="badge bg-warning text-dark">
-                                                    <i class="fas fa-crown"></i> {{ loop.index }}
+                {% if distance == "5K" %}
+                    {% set athletes = girls_by_distance[distance] %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h4><i class="fas fa-route"></i> {{ distance }}</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>Name</th>
+                                            <th>Best Time</th>
+                                            <th>Pace</th>
+                                            <th>Meet</th>
+                                            <th>Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="girls-5k-top10">
+                                        {% for athlete in athletes[:10] %}
+                                        <tr>
+                                            <td>
+                                                {% if loop.index == 1 %}
+                                                    <span class="badge bg-warning text-dark">
+                                                        <i class="fas fa-crown"></i> {{ loop.index }}
+                                                    </span>
+                                                {% elif loop.index <= 3 %}
+                                                    <span class="badge bg-secondary">{{ loop.index }}</span>
+                                                {% else %}
+                                                    {{ loop.index }}
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('athlete_stats', athlete_id=athlete.athlete_id) }}" class="text-decoration-none">
+                                                    <strong>{{ athlete.first_name }} {{ athlete.last_name }}</strong>
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <span class="time-display text-danger">
+                                                    {{ format_time(athlete.best_time) }}
                                                 </span>
-                                            {% elif loop.index <= 3 %}
-                                                <span class="badge bg-secondary">{{ loop.index }}</span>
-                                            {% else %}
-                                                {{ loop.index }}
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <strong>{{ athlete.first_name }} {{ athlete.last_name }}</strong>
-                                        </td>
-                                        <td>
-                                            <span class="time-display text-danger">
-                                                {{ format_time(athlete.best_time) }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span class="pace-display text-success">
-                                                {{ calculate_pace(athlete.best_time, distance) }}
-                                            </span>
-                                        </td>
-                                        <td>{{ athlete.meet_name }}</td>
-                                        <td>{{ athlete.meet_date }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                                            </td>
+                                            <td>
+                                                <span class="pace-display text-success">
+                                                    {{ calculate_pace(athlete.best_time, distance) }}
+                                                </span>
+                                            </td>
+                                            <td>{{ athlete.meet_name }}</td>
+                                            <td>{{ athlete.meet_date }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tbody id="girls-5k-rest" class="collapse">
+                                        {% for athlete in athletes[10:] %}
+                                        <tr>
+                                            <td>
+                                                {% if loop.index + 10 <= 3 %}
+                                                    <span class="badge bg-secondary">{{ loop.index + 10 }}</span>
+                                                {% else %}
+                                                    {{ loop.index + 10 }}
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('athlete_stats', athlete_id=athlete.athlete_id) }}" class="text-decoration-none">
+                                                    <strong>{{ athlete.first_name }} {{ athlete.last_name }}</strong>
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <span class="time-display text-danger">
+                                                    {{ format_time(athlete.best_time) }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="pace-display text-success">
+                                                    {{ calculate_pace(athlete.best_time, distance) }}
+                                                </span>
+                                            </td>
+                                            <td>{{ athlete.meet_name }}</td>
+                                            <td>{{ athlete.meet_date }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% if athletes|length > 10 %}
+                            <div class="text-center mt-3">
+                                <button class="btn btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#girls-5k-rest" aria-expanded="false" id="girls-5k-toggle">
+                                    <i class="fas fa-chevron-down"></i> Show All {{ athletes|length }} Athletes
+                                </button>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
-                </div>
+                {% endif %}
+            {% endfor %}
+
+            <!-- 2M Results (Collapsible) -->
+            {% for distance in girls_distances %}
+                {% if distance != "5K" %}
+                    {% set athletes = girls_by_distance[distance] %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h4>
+                                <button class="btn btn-link text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#girls-{{ distance|replace('m', '')|replace('.', '') }}" aria-expanded="false">
+                                    <i class="fas fa-route"></i> {{ distance }} 
+                                    <i class="fas fa-chevron-down float-end mt-1"></i>
+                                    <small class="text-muted ms-2">(Click to expand)</small>
+                                </button>
+                            </h4>
+                        </div>
+                        <div class="collapse" id="girls-{{ distance|replace('m', '')|replace('.', '') }}">
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Rank</th>
+                                                <th>Name</th>
+                                                <th>Best Time</th>
+                                                <th>Pace</th>
+                                                <th>Meet</th>
+                                                <th>Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for athlete in athletes[:10] %}
+                                            <tr>
+                                                <td>
+                                                    {% if loop.index == 1 %}
+                                                        <span class="badge bg-warning text-dark">
+                                                            <i class="fas fa-crown"></i> {{ loop.index }}
+                                                        </span>
+                                                    {% elif loop.index <= 3 %}
+                                                        <span class="badge bg-secondary">{{ loop.index }}</span>
+                                                    {% else %}
+                                                        {{ loop.index }}
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <a href="{{ url_for('athlete_stats', athlete_id=athlete.athlete_id) }}" class="text-decoration-none">
+                                                        <strong>{{ athlete.first_name }} {{ athlete.last_name }}</strong>
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    <span class="time-display text-danger">
+                                                        {{ format_time(athlete.best_time) }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="pace-display text-success">
+                                                        {{ calculate_pace(athlete.best_time, distance) }}
+                                                    </span>
+                                                </td>
+                                                <td>{{ athlete.meet_name }}</td>
+                                                <td>{{ athlete.meet_date }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             {% endfor %}
         {% else %}
             <div class="alert alert-info">
@@ -147,4 +371,40 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Handle boys 5K expand/collapse
+    document.addEventListener('DOMContentLoaded', function() {
+        const boysToggle = document.getElementById('boys-5k-toggle');
+        const boysRest = document.getElementById('boys-5k-rest');
+        
+        if (boysToggle && boysRest) {
+            boysRest.addEventListener('show.bs.collapse', function() {
+                boysToggle.innerHTML = '<i class="fas fa-chevron-up"></i> Show Top 10 Only';
+            });
+            
+            boysRest.addEventListener('hide.bs.collapse', function() {
+                const totalCount = boysToggle.textContent.match(/\d+/)[0];
+                boysToggle.innerHTML = `<i class="fas fa-chevron-down"></i> Show All ${totalCount} Athletes`;
+            });
+        }
+        
+        // Handle girls 5K expand/collapse
+        const girlsToggle = document.getElementById('girls-5k-toggle');
+        const girlsRest = document.getElementById('girls-5k-rest');
+        
+        if (girlsToggle && girlsRest) {
+            girlsRest.addEventListener('show.bs.collapse', function() {
+                girlsToggle.innerHTML = '<i class="fas fa-chevron-up"></i> Show Top 10 Only';
+            });
+            
+            girlsRest.addEventListener('hide.bs.collapse', function() {
+                const totalCount = girlsToggle.textContent.match(/\d+/)[0];
+                girlsToggle.innerHTML = `<i class="fas fa-chevron-down"></i> Show All ${totalCount} Athletes`;
+            });
+        }
+    });
+</script>
 {% endblock %}

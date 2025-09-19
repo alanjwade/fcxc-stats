@@ -39,6 +39,7 @@ class RaceConfig:
     url: Optional[str] = None
     file: Optional[str] = None
     algorithm: Optional[str] = 'default'
+    results_title: Optional[str] = None
 
 @dataclass
 class Athlete:
@@ -198,7 +199,7 @@ class MileSplitScraper:
                         first_name=first_name,
                         last_name=last_name,
                         gender=self.map_gender_for_db(gender),
-                        school=school
+                        school=self.normalize_school_name(school)
                     )
                     result = Result(
                         athlete=athlete,
@@ -432,7 +433,7 @@ class MileSplitScraper:
                         first_name=first_name,
                         last_name=last_name,
                         gender=self.map_gender_for_db(gender),
-                        school=school
+                        school=self.normalize_school_name(school)
                     )
                     
                     result = Result(
@@ -469,6 +470,173 @@ class MileSplitScraper:
         logger.info(f"Parsed {len(results)} results from Thornton race text")
         return results
 
+    def scrape_raw_combined_format(self, source: str, is_file: bool = False, race_config: Optional[RaceConfig] = None) -> List[Result]:
+        """Scrape race results using the raw combined format (custom algorithm with results_title)."""
+        import re
+        try:
+            if is_file:
+                if not os.path.exists(source):
+                    logger.error(f"File not found: {source}")
+                    return []
+                with open(source, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            else:
+                response = self.session.get(source, timeout=30)
+                response.raise_for_status()
+                content = response.text
+
+            # Check if race configuration is provided
+            if not race_config:
+                logger.error("No race configuration provided for raw combined format")
+                return []
+            
+            # Get the results_title from the race configuration
+            results_title = getattr(race_config, 'results_title', None)
+            if not results_title:
+                logger.error("No results_title specified in race configuration for raw combined format")
+                return []
+
+            logger.info(f"Looking for results section: {results_title}")
+            
+            # Find the start of the results section using results_title
+            start_idx = content.find(results_title)
+            if start_idx == -1:
+                logger.warning(f"Results title '{results_title}' not found in content")
+                return []
+
+            # Get content starting from the results_title
+            section_content = content[start_idx:]
+            lines = section_content.splitlines()
+
+            results = []
+            results_started = False
+            header_lines_skipped = 0
+            max_header_lines = 20  # Allow up to 20 lines of headers after results_title
+            
+            # Skip the first line (which is the results_title itself)
+            start_line_idx = 1
+            
+            logger.info(f"Processing {len(lines)} lines from results section")
+            
+            for line_idx, line in enumerate(lines[start_line_idx:], start_line_idx):
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Skip header lines (equals signs, column headers, etc.)
+                if re.match(r'^=+$', line) or re.match(r'^\s*Pl\s+Athlete\s+Yr\s+Team\s+Time', line):
+                    header_lines_skipped += 1
+                    logger.debug(f"Skipping header line {line_idx}: '{line[:30]}...'")
+                    continue
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Stop if we reach another section (Team Results, another race, etc.)
+                stop_patterns = [
+                    r'^Team\s+Results',
+                    r'^Team\s+Scores',
+                    r'^Scoring\s+Summary',
+                    r'^\s*(JV|Varsity)\s+(Boys|Girls)',  # Another race section
+                    r'^\s*\d+\.\s*[A-Za-z]+\s+[A-Za-z]+.*Team\s+Results',  # Team scoring line
+                    r'^={5,}',  # Section dividers with multiple equals signs
+                    r'^\s*Pl\s+Team\s+Points',  # Team scoring header
+                    # Stop when we see the next race type (different from our current one)
+                    r'^Womens\s+\d+,?\d*\s+Meters' if 'Mens' in results_title else r'^Mens\s+\d+,?\d*\s+Meters',
+                    # Stop when we see a different race level (JV vs Varsity)
+                    r'JV' if 'Varsity' in results_title else r'Varsity',
+                ]
+                
+                # Skip the first line (which is the results_title itself)
+                start_idx = 1
+                
+                for pattern in stop_patterns:
+                    if re.search(pattern, line, re.IGNORECASE):
+                        logger.info(f"Stopping parse at line {line_idx}: found section delimiter '{line[:50]}...'")
+                        return results
+                
+                # Try to match a result line: place, name, year, school, time, [points]
+                # Common formats:
+                # "  1 John Doe           12 School Name       16:42.45    1"
+                # "  1 John Doe           12 School Name       16:42.45"
+                result_pattern = r'^\s*(\d+)\s+([A-Za-z\'\-\.\s]+?)\s+(\d{1,2})\s+(.+?)\s+(\d{1,2}:\d{2}\.\d{2})(?:\s+(\d+))?\s*$'
+                match = re.match(result_pattern, line)
+                
+                if match:
+                    results_started = True
+                    try:
+                        place = int(match.group(1))
+                        name = match.group(2).strip()
+                        year = match.group(3).strip()
+                        school = match.group(4).strip()
+                        time_str = match.group(5).strip()
+                        points = match.group(6).strip() if match.group(6) else ""
+
+                        # Parse time to seconds
+                        time_seconds = self.parse_time_to_seconds(time_str)
+                        if time_seconds is None:
+                            logger.warning(f"Could not parse time: {time_str} in line: {line}")
+                            continue
+
+                        # Parse name into first and last
+                        name_parts = name.split()
+                        if len(name_parts) >= 2:
+                            first_name = name_parts[0]
+                            last_name = ' '.join(name_parts[1:])
+                        else:
+                            first_name = name
+                            last_name = ''
+
+                        first_name = self.normalize_name(first_name)
+                        last_name = self.normalize_name(last_name)
+
+                        # Clean up school name
+                        school = school.replace('High Sc', 'High School')
+                        school = school.replace(' HS', ' High School')
+                        
+                        athlete = Athlete(
+                            first_name=first_name,
+                            last_name=last_name,
+                            gender=self.map_gender_for_db(race_config.gender),
+                            school=self.normalize_school_name(school)
+                        )
+
+                        result = Result(
+                            athlete=athlete,
+                            time_seconds=time_seconds,
+                            place=place
+                        )
+
+                        results.append(result)
+                        logger.debug(f"Parsed: {place}. {first_name} {last_name} - {school} - {time_str}")
+                        
+                    except Exception as e:
+                        logger.warning(f"Error parsing raw_combined line '{line}': {e}")
+                        continue
+                        
+                elif results_started and line.strip() == '':
+                    # Empty line after results started might indicate end of results
+                    continue
+                    
+                elif not results_started:
+                    # Allow for headers before results start
+                    header_lines_skipped += 1
+                    if header_lines_skipped > max_header_lines:
+                        logger.warning(f"Skipped {header_lines_skipped} header lines without finding results. Stopping.")
+                        break
+                    continue
+                else:
+                    # Log lines that don't match for debugging
+                    if len(line) > 10 and not line.startswith('=') and not line.startswith('-'):
+                        logger.debug(f"Line didn't match result pattern: '{line[:50]}...'")
+
+            logger.info(f"Parsed {len(results)} results from raw_combined format for {results_title}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error scraping raw_combined format: {e}")
+            raise
+
     def fix_thornton_school_name(self, school_name: str) -> str:
         """Fix truncated school names specifically from Thornton format parsing."""
         # Mapping of truncated names to full names found in Thornton results
@@ -498,6 +666,8 @@ class MileSplitScraper:
             return self.scrape_john_martin_format(source, is_file, gender=gender)
         elif algorithm == 'thornton_combined':
             return self.scrape_thornton_combined_format(source, is_file, gender=gender, race_config=race_config)
+        elif algorithm == 'raw_combined':
+            return self.scrape_raw_combined_format(source, is_file, race_config=race_config)
         # Default algorithm
         try:
             if is_file:
@@ -616,7 +786,7 @@ class MileSplitScraper:
                     first_name=first_name,
                     last_name=last_name,
                     gender=gender_str,
-                    school=school
+                    school=self.normalize_school_name(school)
                 )
                 
                 result = Result(
@@ -744,7 +914,7 @@ class MileSplitScraper:
                         first_name=first_name,
                         last_name=last_name,
                         gender=current_gender,
-                        school=school_name
+                        school=self.normalize_school_name(school_name)
                     )
                     
                     result = Result(
@@ -1077,6 +1247,33 @@ class MileSplitScraper:
     def normalize_name(self, name: str) -> str:
         """Capitalize first letter, lower case the rest for each word in a name."""
         return ' '.join([w.capitalize() for w in name.split()])
+
+    def normalize_school_name(self, school: str) -> str:
+        """Normalize school names to standard formats."""
+        school = school.strip()
+        
+        # Map common school name variations to standardized names
+        school_mappings = {
+            'Fort Collins': 'Fort Collins High School',
+            'Fort Collins HS': 'Fort Collins High School',
+            'FCHS': 'Fort Collins High School',
+            'Fossil Ridge HS': 'Fossil Ridge High School',
+            'Fossil Ridge': 'Fossil Ridge High School',
+            'Rocky Mountain HS': 'Rocky Mountain High School',
+            'Rocky Mountain': 'Rocky Mountain High School',
+        }
+        
+        # Check exact matches first
+        if school in school_mappings:
+            return school_mappings[school]
+        
+        # Check for partial matches and common patterns
+        if school.endswith(' HS') and not school.endswith(' High School'):
+            # Convert "School Name HS" to "School Name High School"
+            base_name = school[:-3].strip()
+            return f"{base_name} High School"
+        
+        return school
 
 def main():
     """Main function to run the scraper."""

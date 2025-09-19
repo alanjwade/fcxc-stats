@@ -3,6 +3,21 @@
 -- Create database extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Analytics table for tracking page views
+CREATE TABLE page_views (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    page_path VARCHAR(500) NOT NULL,
+    user_agent TEXT,
+    ip_address INET,
+    referer TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    session_id VARCHAR(100)
+);
+
+-- Index for analytics queries
+CREATE INDEX idx_page_views_timestamp ON page_views(timestamp);
+CREATE INDEX idx_page_views_page_path ON page_views(page_path);
+
 -- Athletes table
 CREATE TABLE athletes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

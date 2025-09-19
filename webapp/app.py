@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Cross Country Statistics Web Application
+Cross Country Statistics We    # Exclude localhost/development IPs
+    if client_ip in EXCLUDED_IPS:
+        return Falsepplication
 
 Flask web application that provides:
 1. CSV export of athlete performance data
@@ -12,6 +14,7 @@ Flask web application that provides:
 import os
 import io
 import csv
+import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Union
 import decimal
@@ -35,6 +38,70 @@ engine = create_engine(DATABASE_URL)
 
 # Filter for Fort Collins High School only
 SCHOOL_FILTER = "Fort Collins High School"
+
+# Analytics configuration - simplified
+EXCLUDED_IPS = {
+    '127.0.0.1',  # localhost
+    '::1',        # localhost IPv6
+    '192.168.1.1', # your development machine
+    # Add your local machine IP here if accessing from different machine
+}
+
+def should_track_simple(path: str) -> bool:
+    """Determine if this page view should be tracked - simplified version."""
+    # Get client IP (handle proxy headers)
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if client_ip:
+        client_ip = client_ip.split(',')[0].strip()
+    
+    # Exclude localhost/development IPs
+    if client_ip in EXCLUDED_IPS:
+        return False
+    
+    # Only track team stats and athlete pages
+    if path == '/team/stats':
+        return True
+    elif path.startswith('/athlete/'):
+        return True
+    else:
+        return False
+
+def track_analytics(page_type: str):
+    """Track a page view for analytics."""
+    try:
+        # Get client IP (handle proxy headers)
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if client_ip:
+            client_ip = client_ip.split(',')[0].strip()
+        
+        # Exclude localhost/development IPs
+        if client_ip in EXCLUDED_IPS:
+            return
+        
+        user_agent = request.headers.get('User-Agent', '')
+        print(f"Tracking analytics: page_type={page_type}, ip={client_ip}")
+        
+        # Generate session ID based on IP and user agent for unique visitor counting
+        session_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{client_ip}:{user_agent}"))
+        
+        with engine.connect() as conn:
+            print(f"About to execute SQL with page_type: {page_type}")
+            conn.execute(
+                text("""
+                    INSERT INTO page_views (page_path, user_agent, ip_address, session_id)
+                    VALUES (:page_type, :user_agent, :ip_address, :session_id)
+                """),
+                {
+                    "page_type": page_type,
+                    "user_agent": user_agent[:100],  # Truncate user agent
+                    "ip_address": client_ip,
+                    "session_id": session_id
+                }
+            )
+            conn.commit()
+            print(f"Successfully inserted analytics record for: {page_type}")
+    except Exception as e:
+        logger.error(f"Error tracking analytics: {e}")
 
 def format_time(seconds: Union[float, decimal.Decimal]) -> str:
     """Format time from seconds to MM:SS.ss format with fractional seconds."""
@@ -264,6 +331,9 @@ def export_csv():
 @app.route('/team/stats')
 def team_stats():
     """Team statistics page with best times by gender."""
+    # Track this page view
+    track_analytics('team_stats')
+    
     try:
         with get_db_connection() as conn:
             # Get best times by gender and distance for Fort Collins High School
@@ -287,6 +357,7 @@ def team_stats():
                         bt.last_name,
                         bt.distance,
                         bt.best_time,
+                        a.id as athlete_id,
                         m.name as meet_name,
                         r.name as race_name,
                         m.meet_date,
@@ -302,6 +373,7 @@ def team_stats():
                     last_name,
                     distance,
                     best_time,
+                    athlete_id,
                     meet_name,
                     race_name,
                     meet_date
@@ -329,6 +401,7 @@ def team_stats():
                         bt.last_name,
                         bt.distance,
                         bt.best_time,
+                        a.id as athlete_id,
                         m.name as meet_name,
                         r.name as race_name,
                         m.meet_date,
@@ -344,6 +417,7 @@ def team_stats():
                     last_name,
                     distance,
                     best_time,
+                    athlete_id,
                     meet_name,
                     race_name,
                     meet_date
@@ -401,6 +475,9 @@ def team_stats():
 @app.route('/athlete/<athlete_id>')
 def athlete_stats(athlete_id):
     """Individual athlete statistics page."""
+    # Track this page view
+    track_analytics('athlete_page')
+    
     try:
         with get_db_connection() as conn:
             # Get athlete info (only Fort Collins High School athletes)
@@ -449,7 +526,12 @@ def athlete_stats(athlete_id):
                 JOIN races r ON res.race_id = r.id
                 WHERE res.athlete_id = :athlete_id
                 GROUP BY r.distance
-                ORDER BY r.distance
+                ORDER BY 
+                    CASE 
+                        WHEN r.distance = '5K' THEN 1 
+                        ELSE 2 
+                    END,
+                    r.distance
             """)
             
             prs = conn.execute(prs_query, {'athlete_id': athlete_id}).fetchall()
@@ -482,9 +564,10 @@ def athletes_list():
                     a.gender,
                     a.graduation_year,
                     COUNT(res.id) as race_count,
-                    MIN(res.time_seconds) as best_time
+                    MIN(CASE WHEN r.distance = '5K' THEN res.time_seconds END) as best_time
                 FROM athletes a
                 LEFT JOIN results res ON a.id = res.athlete_id
+                LEFT JOIN races r ON res.race_id = r.id
                 WHERE a.school = :school
                 GROUP BY a.id, a.first_name, a.last_name, a.gender, a.graduation_year
                 ORDER BY a.last_name, a.first_name
@@ -584,6 +667,68 @@ def athlete_progress_api(athlete_id, distance):
     except Exception as e:
         logger.error(f"Error getting athlete progress: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/analytics-dashboard-x7j9k2')
+def analytics_dashboard():
+    """Hidden analytics dashboard - URL obfuscated to keep it private."""
+    try:
+        with get_db_connection() as conn:
+            # Overall stats
+            overall_stats = conn.execute(text("""
+                SELECT 
+                    COUNT(*) as total_views,
+                    COUNT(DISTINCT session_id) as unique_visitors,
+                    SUM(CASE WHEN page_path = 'team_stats' THEN 1 ELSE 0 END) as team_stats_views,
+                    SUM(CASE WHEN page_path = 'athlete_page' THEN 1 ELSE 0 END) as athlete_page_views,
+                    COUNT(DISTINCT DATE(timestamp)) as active_days
+                FROM page_views
+                WHERE timestamp >= NOW() - INTERVAL '30 days'
+            """)).fetchone()
+            
+            # Daily activity (last 30 days)
+            daily_stats = conn.execute(text("""
+                SELECT 
+                    DATE(timestamp) as date,
+                    SUM(CASE WHEN page_path = 'team_stats' THEN 1 ELSE 0 END) as team_stats_views,
+                    SUM(CASE WHEN page_path = 'athlete_page' THEN 1 ELSE 0 END) as athlete_page_views,
+                    COUNT(DISTINCT session_id) as unique_visitors
+                FROM page_views
+                WHERE timestamp >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(timestamp)
+                ORDER BY date DESC
+            """)).fetchall()
+            
+            # Hourly pattern (last 7 days)
+            hourly_stats = conn.execute(text("""
+                SELECT 
+                    EXTRACT(HOUR FROM timestamp) as hour,
+                    COUNT(*) as views
+                FROM page_views
+                WHERE timestamp >= NOW() - INTERVAL '7 days'
+                GROUP BY EXTRACT(HOUR FROM timestamp)
+                ORDER BY hour
+            """)).fetchall()
+            
+            # Recent activity (last 50 views)
+            recent_activity = conn.execute(text("""
+                SELECT 
+                    page_path,
+                    timestamp,
+                    ip_address
+                FROM page_views
+                ORDER BY timestamp DESC
+                LIMIT 50
+            """)).fetchall()
+            
+            return render_template('analytics_dashboard.html',
+                                overall_stats=overall_stats,
+                                daily_stats=daily_stats,
+                                hourly_stats=hourly_stats,
+                                recent_activity=recent_activity)
+    
+    except Exception as e:
+        logger.error(f"Error loading analytics dashboard: {e}")
+        return render_template('error.html', error=str(e)), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

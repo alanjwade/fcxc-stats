@@ -195,6 +195,107 @@ races:
     algorithm: default
     
 
+  # Liberty Bell Cross Country Invitational 2025 - September 13, 2025
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "Varsity Boys"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Mens 5,000 Meters Saucony Sweepstakes Varsity Results"
+
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "Varsity Girls"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Womens 5,000 Meters Runners Roost Sweepstakes Varsity Results"
+
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "JV Boys"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "boys"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Mens 5,000 Meters Sweepstakes JV Results"
+
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "JV Girls"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "girls"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Womens 5,000 Meters Sweepstakes JV Results"
+
+# Example of raw_combined algorithm configuration
+# This algorithm parses results from a combined HTML file using a results_title to find specific sections
+# Uncomment and modify these entries to use the raw_combined algorithm:
+#
+#  - meet_name: "Example Combined Meet 2025"
+#    race_name: "JV Boys"
+#    file: "pages/Example Combined Meet 2025 - Results.html"
+#    distance: "5K"
+#    race_class: "jv"
+#    gender: "boys"
+#    venue: "Example Venue"
+#    date: "2025-09-15"
+#    season: "2025"
+#    algorithm: raw_combined
+#    results_title: "JV Boys 5000 Meter Run"
+#
+#  - meet_name: "Example Combined Meet 2025"
+#    race_name: "JV Girls"
+#    file: "pages/Example Combined Meet 2025 - Results.html"
+#    distance: "5K"
+#    race_class: "jv"
+#    gender: "girls"
+#    venue: "Example Venue"
+#    date: "2025-09-15"
+#    season: "2025"
+#    algorithm: raw_combined
+#    results_title: "JV Girls 5000 Meter Run"
+#
+#  - meet_name: "Example Combined Meet 2025"
+#    race_name: "Varsity Boys"
+#    file: "pages/Example Combined Meet 2025 - Results.html"
+#    distance: "5K"
+#    race_class: "varsity"
+#    gender: "boys"
+#    venue: "Example Venue"
+#    date: "2025-09-15"
+#    season: "2025"
+#    algorithm: raw_combined
+#    results_title: "Varsity Boys 5000 Meter Run"
+#
+#  - meet_name: "Example Combined Meet 2025"
+#    race_name: "Varsity Girls"
+#    file: "pages/Example Combined Meet 2025 - Results.html"
+#    distance: "5K"
+#    race_class: "varsity"
+#    gender: "girls"
+#    venue: "Example Venue"
+#    date: "2025-09-15"
+#    season: "2025"
+#    algorithm: raw_combined
+#    results_title: "Varsity Girls 5000 Meter Run"
+
 # Team information
 team:
   name: "Fort Collins High School"
