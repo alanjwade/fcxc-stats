@@ -1,0 +1,22 @@
+# Test configuration for just Loveland Sweetheart Varsity Girls
+races:
+  # Loveland Sweetheart 2025 - February 8, 2025
+  - meet_name: "Loveland Sweetheart 2025"
+    race_name: "Varsity Girls"
+    file: "pages/Loveland Sweetheart 2025.txt"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Loveland High School"
+    date: "2025-02-08"
+    season: "2025"
+    algorithm: loveland_sweetheart
+    results_title: "HS Varsity Girls 5K"
+
+# Team information
+team:
+  name: "Fort Collins High School"
+  abbreviation: "FCHS"
+  colors:
+    primary: "#FF0000"
+    secondary: "#FFFFFF"

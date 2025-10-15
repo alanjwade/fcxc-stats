@@ -14,6 +14,55 @@
 # Use either 'url' for online scraping or 'file' for local HTML files
 
 races:
+  # Windsor Wizards Invitational 2025 - September 21, 2025
+  - meet_name: "Windsor Wizards Invitational 2025"
+    race_name: "Varsity Boys"
+    file: "pages/Windsor Wizards Invitational 2025 - Complete Results (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Windsor High School"
+    date: "2025-09-21"
+    season: "2025"
+    algorithm: raw_windsor_combined
+    results_title: "Windsor HS Varsity Boys"
+
+  - meet_name: "Windsor Wizards Invitational 2025"
+    race_name: "Varsity Girls"
+    file: "pages/Windsor Wizards Invitational 2025 - Complete Results (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Windsor High School"
+    date: "2025-09-21"
+    season: "2025"
+    algorithm: raw_windsor_combined
+    results_title: "Windsor HS Varsity Girls"
+
+  - meet_name: "Windsor Wizards Invitational 2025"
+    race_name: "JV Boys"
+    file: "pages/Windsor Wizards Invitational 2025 - Complete Results (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "boys"
+    venue: "Windsor High School"
+    date: "2025-09-21"
+    season: "2025"
+    algorithm: raw_windsor_combined
+    results_title: "Windsor HS JV Boys"
+
+  - meet_name: "Windsor Wizards Invitational 2025"
+    race_name: "JV Girls"
+    file: "pages/Windsor Wizards Invitational 2025 - Complete Results (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "girls"
+    venue: "Windsor High School"
+    date: "2025-09-21"
+    season: "2025"
+    algorithm: raw_windsor_combined
+    results_title: "Windsor HS JV Girls"
+
   # Thornton Cross Country Invitational 2025 - September 5, 2025
   - meet_name: "Thornton Cross Country Invitational 2025"
     race_name: "JV Boys"
@@ -244,6 +293,30 @@ races:
     algorithm: raw_combined
     results_title: "Womens 5,000 Meters Sweepstakes JV Results"
 
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "Open Boys"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "boys"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Mens 5,000 Meters Sweepstakes Open Results"
+
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "Open Girls"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "girls"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Womens 5,000 Meters Sweepstakes Open Results"
+
 # Example of raw_combined algorithm configuration
 # This algorithm parses results from a combined HTML file using a results_title to find specific sections
 # Uncomment and modify these entries to use the raw_combined algorithm:
@@ -296,6 +369,152 @@ races:
 #    algorithm: raw_combined
 #    results_title: "Varsity Girls 5000 Meter Run"
 
+  # Desert Twilight XC Invite 2025 - September 26, 2025
+  - meet_name: "Desert Twilight XC Invite 2025"
+    race_name: "Boys Sweepstakes"
+    file: "pages/Desert Twilight Boys.txt"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Toka Sticks Golf Course, AZ"
+    date: "2025-09-26"
+    season: "2025"
+    algorithm: desert_twilight
+    results_title: "Mens 5,000 Meters Sweepstakes"
+
+  - meet_name: "Desert Twilight XC Invite 2025"
+    race_name: "Girls Sweepstakes"
+    file: "pages/Desert Twilight Girls.txt"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Toka Sticks Golf Course, AZ"
+    date: "2025-09-26"
+    season: "2025"
+    algorithm: desert_twilight
+    results_title: "Womens 5,000 Meters Sweepstakes"
+
+  # Loveland Sweetheart 2025 - September 27, 2025
+  - meet_name: "Loveland Sweetheart 2025"
+    race_name: "Varsity Boys"
+    file: "pages/Loveland Sweetheart 2025.txt"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Loveland High School"
+    date: "2025-09-27"
+    season: "2025"
+    algorithm: loveland_sweetheart
+    results_title: "HS Varsity Boys 5K"
+
+  - meet_name: "Loveland Sweetheart 2025"
+    race_name: "Varsity Girls"
+    file: "pages/Loveland Sweetheart 2025.txt"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Loveland High School"
+    date: "2025-09-27"
+    season: "2025"
+    algorithm: loveland_sweetheart
+    results_title: "HS Varsity Girls 5K"
+
+  - meet_name: "Loveland Sweetheart 2025"
+    race_name: "JV Boys"
+    file: "pages/Loveland Sweetheart 2025.txt"
+    distance: "5K"
+    race_class: "jv"
+    gender: "boys"
+    venue: "Loveland High School"
+    date: "2025-09-27"
+    season: "2025"
+    algorithm: loveland_sweetheart
+    results_title: "Boys HS Open 5K"
+
+  - meet_name: "Loveland Sweetheart 2025"
+    race_name: "JV Girls"
+    file: "pages/Loveland Sweetheart 2025.txt"
+    distance: "5K"
+    race_class: "jv"
+    gender: "girls"
+    venue: "Loveland High School"
+    date: "2025-09-27"
+    season: "2025"
+    algorithm: loveland_sweetheart
+    results_title: "Girls HS Open 5K"
+
+  # Longs Peak Invitational 2025 - October 3, 2025
+  - meet_name: "Longs Peak Invitational 2025"
+    race_name: "Varsity Boys"
+    file: "pages/Longs Peak Invite Boys 2025.txt"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Estes Park HS XC Course"
+    date: "2025-10-03"
+    season: "2025"
+    algorithm: longs_peak
+
+  - meet_name: "Longs Peak Invitational 2025"
+    race_name: "Varsity Girls"
+    file: "pages/Longs Peak Invite Girls 2025.txt"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Estes Park HS XC Course"
+    date: "2025-10-03"
+    season: "2025"
+    algorithm: longs_peak
+
+  # Northern Conference Championships 2025 - October 10, 2025
+  - meet_name: "Northern Conference Championships 2025"
+    race_name: "Varsity Boys"
+    file: "pages/Northern Conference Champs 2025.txt"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Spring Canyon Park"
+    date: "2025-10-10"
+    season: "2025"
+    algorithm: northern_conference
+    race_number: 3
+
+  - meet_name: "Northern Conference Championships 2025"
+    race_name: "Varsity Girls"
+    file: "pages/Northern Conference Champs 2025.txt"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Spring Canyon Park"
+    date: "2025-10-10"
+    season: "2025"
+    algorithm: northern_conference
+    race_number: 4
+
+  - meet_name: "Northern Conference Championships 2025"
+    race_name: "JV Boys"
+    file: "pages/Northern Conference Champs 2025.txt"
+    distance: "5K"
+    race_class: "jv"
+    gender: "boys"
+    venue: "Spring Canyon Park"
+    date: "2025-10-10"
+    season: "2025"
+    algorithm: northern_conference
+    race_number: 5
+
+  - meet_name: "Northern Conference Championships 2025"
+    race_name: "JV Girls"
+    file: "pages/Northern Conference Champs 2025.txt"
+    distance: "5K"
+    race_class: "jv"
+    gender: "girls"
+    venue: "Spring Canyon Park"
+    date: "2025-10-10"
+    season: "2025"
+    algorithm: northern_conference
+    race_number: 6
+
 # Team information
 team:
   name: "Fort Collins High School"
@@ -303,3 +522,4 @@ team:
   colors:
     primary: "#FF0000"
     secondary: "#FFFFFF"
+

@@ -40,6 +40,7 @@ class RaceConfig:
     file: Optional[str] = None
     algorithm: Optional[str] = 'default'
     results_title: Optional[str] = None
+    race_number: Optional[int] = None
 
 @dataclass
 class Athlete:
@@ -110,31 +111,46 @@ class MileSplitScraper:
         """Parse time string (MM:SS.ss, MM:SS, or extended formats) to total seconds with fractional support."""
         time_str = time_str.strip()
         patterns = [
-            r'(\d{1,2}):(\d{2}):(\d{2})\.(\d{2})', # H:MM:SS.ss (for very long times)
+            r'(\d{1,2}):(\d{2}):(\d{2})\.(\d{1,2})', # H:MM:SS.s or H:MM:SS.ss (for very long times)
             r'(\d{1,2}):(\d{2}):(\d{2})',        # MM:SS:ss (hundredths)
-            r'(\d{1,2}):(\d{2})\.(\d{2})',      # MM:SS.ss
+            r'(\d{1,2}):(\d{2})\.(\d{1,2})',      # MM:SS.s or MM:SS.ss
             r'(\d{1,2}):(\d{2})',              # MM:SS
-            r'(\d{3,4})\.(\d{2})'              # SSS.ss or SSSS.ss (seconds only)
+            r'(\d{3,4})\.(\d{1,2})'              # SSS.s or SSS.ss or SSSS.s or SSSS.ss (seconds only)
         ]
         for i, pattern in enumerate(patterns):
             match = re.match(pattern, time_str)
             if match:
                 groups = match.groups()
-                if i == 0:  # H:MM:SS.ss
-                    hours, minutes, seconds, hundredths = groups
-                    total = float(int(hours) * 3600 + int(minutes) * 60 + int(seconds)) + float(int(hundredths)) / 100.0
+                if i == 0:  # H:MM:SS.s or H:MM:SS.ss
+                    hours, minutes, seconds, fractional = groups
+                    # Handle variable decimal places (1 or 2 digits)
+                    if len(fractional) == 1:
+                        fractional_seconds = float(int(fractional)) / 10.0
+                    else:
+                        fractional_seconds = float(int(fractional)) / 100.0
+                    total = float(int(hours) * 3600 + int(minutes) * 60 + int(seconds)) + fractional_seconds
                 elif i == 1:  # MM:SS:ss (hundredths)
                     minutes, seconds, hundredths = groups
                     total = float(int(minutes) * 60 + int(seconds)) + float(int(hundredths)) / 100.0
-                elif i == 2:  # MM:SS.ss
-                    minutes, seconds, hundredths = groups
-                    total = float(int(minutes) * 60 + int(seconds)) + float(int(hundredths)) / 100.0
+                elif i == 2:  # MM:SS.s or MM:SS.ss
+                    minutes, seconds, fractional = groups
+                    # Handle variable decimal places (1 or 2 digits)
+                    if len(fractional) == 1:
+                        fractional_seconds = float(int(fractional)) / 10.0
+                    else:
+                        fractional_seconds = float(int(fractional)) / 100.0
+                    total = float(int(minutes) * 60 + int(seconds)) + fractional_seconds
                 elif i == 3:  # MM:SS
                     minutes, seconds = groups
                     total = float(int(minutes) * 60 + int(seconds))
-                elif i == 4:  # SSS.ss or SSSS.ss
-                    seconds, hundredths = groups
-                    total = float(int(seconds)) + float(int(hundredths)) / 100.0
+                elif i == 4:  # SSS.s or SSS.ss or SSSS.s or SSSS.ss
+                    seconds, fractional = groups
+                    # Handle variable decimal places (1 or 2 digits)
+                    if len(fractional) == 1:
+                        fractional_seconds = float(int(fractional)) / 10.0
+                    else:
+                        fractional_seconds = float(int(fractional)) / 100.0
+                    total = float(int(seconds)) + fractional_seconds
                 # Sanity check: reject times over 1 hour (3600 seconds)
                 if total > 3600:
                     print(f"ERROR: Parsed time exceeds sanity threshold: {total} seconds from '{time_str}'")
@@ -637,10 +653,173 @@ class MileSplitScraper:
             logger.error(f"Error scraping raw_combined format: {e}")
             raise
 
+    def scrape_raw_windsor_combined_format(self, source: str, is_file: bool = False, race_config: Optional[RaceConfig] = None) -> List[Result]:
+        """Scrape race results using the Windsor combined format (custom algorithm with results_title)."""
+        import re
+        try:
+            if is_file:
+                if not os.path.exists(source):
+                    logger.error(f"File not found: {source}")
+                    return []
+                with open(source, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            else:
+                response = self.session.get(source, timeout=30)
+                response.raise_for_status()
+                content = response.text
+
+            # Check if race configuration is provided
+            if not race_config:
+                logger.error("No race configuration provided for raw Windsor combined format")
+                return []
+            
+            # Get the results_title from the race configuration
+            results_title = getattr(race_config, 'results_title', None)
+            if not results_title:
+                logger.error("No results_title specified in race configuration for raw Windsor combined format")
+                return []
+
+            logger.info(f"Looking for Windsor race section: {results_title}")
+            
+            # Find the start of the results section using results_title
+            start_idx = content.find(results_title)
+            if start_idx == -1:
+                logger.warning(f"Results title '{results_title}' not found in content")
+                return []
+
+            # Get content starting from the results_title
+            section_content = content[start_idx:]
+            lines = section_content.splitlines()
+
+            results = []
+            
+            # Skip the first line (which is the results_title itself)
+            # Skip team results section - look for the athlete results table
+            current_line_idx = 1
+            in_team_section = True
+            
+            logger.info(f"Processing {len(lines)} lines from Windsor results section")
+            
+            # Skip team results - look for the athlete results header
+            while current_line_idx < len(lines) and in_team_section:
+                line = lines[current_line_idx].strip()
+                
+                # Look for the athlete results header (starts with Pl, Athlete, etc.)
+                if re.match(r'^\s*Pl\s+Athlete\s+Yr.*Team.*Time', line):
+                    # Found the athlete results header, skip it and the separator line
+                    current_line_idx += 1
+                    if current_line_idx < len(lines) and re.match(r'^=+$', lines[current_line_idx].strip()):
+                        current_line_idx += 1
+                    in_team_section = False
+                    break
+                    
+                current_line_idx += 1
+            
+            if in_team_section:
+                logger.warning(f"Could not find athlete results section for {results_title}")
+                return []
+            
+            # Now parse the athlete results
+            for line_idx in range(current_line_idx, len(lines)):
+                line = lines[line_idx].strip()
+                if not line:
+                    continue
+                
+                # Stop if we reach another section (next race, end of results)
+                stop_patterns = [
+                    r'^Windsor HS.*Boys|^Windsor HS.*Girls',  # Next Windsor race section
+                    r'^[A-Z][a-z]+ HS.*Boys|^[A-Z][a-z]+ HS.*Girls',  # Any other school's race section
+                    r'^={3,}$',  # Section dividers
+                    r'^\s*Middle School',  # Middle school sections to ignore
+                ]
+                
+                for pattern in stop_patterns:
+                    if re.search(pattern, line, re.IGNORECASE):
+                        logger.info(f"Stopping Windsor parse at line {line_idx}: found section delimiter '{line[:50]}...'")
+                        logger.info(f"Parsed {len(results)} results from Windsor format for {results_title}")
+                        return results
+                
+                # Parse Windsor format result line:
+                # "   1 STEVESON, Lucas         SR 8088 Cheyenne East High S          1    15:52.3        --- "
+                # Place, LASTNAME, Firstname, Year, Bib, School, Score, Time, Gap
+                result_pattern = r'^\s*(\d+)\s+([A-Z\s\-\']+),\s*([A-Za-z\s\-\']+?)\s+(SR|JR|SO|FR|\d{1,2})\s+(\d+)\s+(.+?)\s+(\d+|)\s+(\d{1,2}:\d{2}\.\d+)\s+.*$'
+                match = re.match(result_pattern, line)
+                
+                if match:
+                    try:
+                        place = int(match.group(1))
+                        last_name_raw = match.group(2).strip()
+                        first_name = match.group(3).strip()
+                        year_str = match.group(4).strip()
+                        bib = match.group(5).strip()
+                        school_raw = match.group(6).strip()
+                        score = match.group(7).strip()
+                        time_str = match.group(8).strip()
+                        
+                        # Normalize last name (convert from ALL CAPS)
+                        last_name = last_name_raw.title()
+                        
+                        # Convert year abbreviation to graduation year
+                        current_year = 2025
+                        if year_str in ['SR', '12']:
+                            graduation_year = current_year
+                        elif year_str in ['JR', '11']:
+                            graduation_year = current_year + 1
+                        elif year_str in ['SO', '10']:
+                            graduation_year = current_year + 2
+                        elif year_str in ['FR', '9']:
+                            graduation_year = current_year + 3
+                        else:
+                            graduation_year = None
+
+                        # Clean up school name
+                        school = self.fix_thornton_school_name(school_raw.strip())
+                        
+                        # Parse time
+                        time_seconds = self.parse_time_to_seconds(time_str)
+                        if time_seconds is None:
+                            logger.warning(f"Could not parse time '{time_str}' for {first_name} {last_name}")
+                            continue
+
+                        # Create athlete object
+                        # Map gender from race config to database format
+                        db_gender = 'male' if race_config.gender == 'boys' else 'female'
+                        
+                        athlete = Athlete(
+                            first_name=first_name,
+                            last_name=last_name,
+                            gender=db_gender,
+                            school=school,
+                            graduation_year=graduation_year
+                        )
+
+                        result = Result(
+                            athlete=athlete,
+                            time_seconds=time_seconds,
+                            place=place
+                        )
+                        results.append(result)
+                        
+                    except (ValueError, IndexError) as e:
+                        logger.warning(f"Error parsing Windsor result line: '{line}' - {e}")
+                        continue
+                else:
+                    # Log lines that don't match for debugging
+                    if len(line) > 10 and not line.startswith('=') and not line.startswith('-'):
+                        logger.debug(f"Windsor line didn't match result pattern: '{line[:50]}...'")
+
+            logger.info(f"Parsed {len(results)} results from Windsor format for {results_title}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error scraping Windsor combined format: {e}")
+            raise
+
     def fix_thornton_school_name(self, school_name: str) -> str:
         """Fix truncated school names specifically from Thornton format parsing."""
         # Mapping of truncated names to full names found in Thornton results
         school_mappings = {
+            'Fort Collins': 'Fort Collins High School',  # Desert Twilight format
             'Fort Collins High Sc': 'Fort Collins High School',
             'Fossil Ridge High Sc': 'Fossil Ridge High School', 
             'Rocky Mountain High': 'Rocky Mountain High School',
@@ -662,12 +841,23 @@ class MileSplitScraper:
 
     def scrape_race_results(self, source: str, is_file: bool = False, algorithm: str = 'default', gender: str = 'unknown', race_config: Optional[RaceConfig] = None) -> List[Result]:
         """Scrape race results using the selected algorithm."""
+        logger.info(f"Algorithm selected: '{algorithm}' for source: {source}")
         if algorithm == 'john_martin':
             return self.scrape_john_martin_format(source, is_file, gender=gender)
         elif algorithm == 'thornton_combined':
             return self.scrape_thornton_combined_format(source, is_file, gender=gender, race_config=race_config)
         elif algorithm == 'raw_combined':
             return self.scrape_raw_combined_format(source, is_file, race_config=race_config)
+        elif algorithm == 'raw_windsor_combined':
+            return self.scrape_raw_windsor_combined_format(source, is_file, race_config=race_config)
+        elif algorithm == 'desert_twilight':
+            return self.scrape_desert_twilight_format(source, is_file, race_config=race_config)
+        elif algorithm == 'loveland_sweetheart':
+            return self.scrape_loveland_sweetheart_format(source, is_file, race_config=race_config)
+        elif algorithm == 'longs_peak':
+            return self.scrape_longs_peak_format(source, is_file, race_config=race_config)
+        elif algorithm == 'northern_conference':
+            return self.scrape_northern_conference_format(source, is_file, race_config=race_config)
         # Default algorithm
         try:
             if is_file:
@@ -725,6 +915,721 @@ class MileSplitScraper:
         except Exception as e:
             logger.error(f"Error scraping {source}: {e}")
             return []
+
+    def scrape_desert_twilight_format(self, source: str, is_file: bool = False, race_config: Optional[RaceConfig] = None) -> List[Result]:
+        """Scrape race results using the Desert Twilight format."""
+        import re
+        try:
+            if is_file:
+                if not os.path.exists(source):
+                    logger.error(f"File not found: {source}")
+                    return []
+                with open(source, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            else:
+                response = self.session.get(source, timeout=30)
+                response.raise_for_status()
+                content = response.text
+
+            # Check if race configuration is provided
+            if not race_config:
+                logger.error("No race configuration provided for Desert Twilight format")
+                return []
+            
+            # Get the results_title from the race configuration
+            results_title = getattr(race_config, 'results_title', None)
+            if not results_title:
+                logger.error("No results_title specified in race configuration for Desert Twilight format")
+                return []
+
+            logger.info(f"Looking for Desert Twilight race section: {results_title}")
+            
+            # Find the start of the results section using results_title
+            start_idx = content.find(results_title)
+            if start_idx == -1:
+                logger.warning(f"Results title '{results_title}' not found in content")
+                return []
+
+            # Get content starting from the results_title
+            section_content = content[start_idx:]
+            lines = section_content.splitlines()
+
+            results = []
+            
+            logger.info(f"Processing {len(lines)} lines from Desert Twilight results section")
+            
+            # Start from line 1 (skip the results_title line)
+            current_line_idx = 1
+            
+            # Skip header lines until we find the first result (place "1")
+            while current_line_idx < len(lines):
+                line = lines[current_line_idx].strip()
+                
+                # Look specifically for place "1" to start actual results
+                if line == "1":
+                    break
+                
+                current_line_idx += 1
+            
+            if current_line_idx >= len(lines):
+                logger.warning(f"Could not find results for {results_title}")
+                return []
+            
+            # Parse the results - format is:
+            # place
+            # optional abbreviation (2 letters)  
+            # name
+            # team
+            # time
+            # year info (with optional PR indicator)
+            i = current_line_idx
+            while i < len(lines):
+                line = lines[i].strip()
+                if not line:
+                    i += 1
+                    continue
+                
+                # Check if we've reached the end (next race section)
+                if line in ['Team Scores', 'Charts'] or line.startswith('View All Records'):
+                    break
+                
+                # Look for place number
+                if re.match(r'^\d+$', line):
+                    try:
+                        place = int(line)
+                        i += 1
+                        
+                        # Check for optional abbreviation on next line (2 letters or malformed like "A(" or "M(")
+                        if i < len(lines):
+                            next_line = lines[i].strip()
+                            # Match complete abbreviations (2 letters) or malformed ones (letter + symbol)
+                            if re.match(r'^[A-Z]{2}$', next_line) or re.match(r'^[A-Z][^a-zA-Z\s]', next_line):
+                                # Skip the abbreviation (valid or malformed)
+                                i += 1
+                        
+                        # Get name (should be next line)
+                        if i >= len(lines):
+                            break
+                        name_line = lines[i].strip()
+                        if not name_line:
+                            i += 1
+                            continue
+                        i += 1
+                        
+                        # Get team (should be next line)
+                        if i >= len(lines):
+                            break
+                        team_line = lines[i].strip()
+                        if not team_line:
+                            i += 1
+                            continue
+                        i += 1
+                        
+                        # Get time (should be next line)
+                        if i >= len(lines):
+                            break
+                        time_line = lines[i].strip()
+                        if not time_line:
+                            i += 1
+                            continue
+                        i += 1
+                        
+                        # Get year info (should be next line)
+                        if i >= len(lines):
+                            break
+                        year_line = lines[i].strip()
+                        if not year_line:
+                            i += 1
+                            continue
+                        i += 1
+                        
+                        # Parse the extracted data
+                        first_name, last_name = self.parse_desert_twilight_name(name_line)
+                        school = self.fix_thornton_school_name(team_line)
+                        time_seconds = self.parse_time_to_seconds(time_line)
+                        graduation_year = self.parse_desert_twilight_year(year_line)
+                        
+                        if time_seconds is None:
+                            logger.warning(f"Could not parse time '{time_line}' for {first_name} {last_name}")
+                            continue
+                        
+                        # Create athlete object
+                        # Map gender from race config to database format
+                        db_gender = 'male' if race_config.gender == 'boys' else 'female'
+                        
+                        athlete = Athlete(
+                            first_name=first_name,
+                            last_name=last_name,
+                            gender=db_gender,
+                            school=school,
+                            graduation_year=graduation_year
+                        )
+
+                        result = Result(
+                            athlete=athlete,
+                            time_seconds=time_seconds,
+                            place=place
+                        )
+                        results.append(result)
+                        
+                        logger.debug(f"Parsed: {place}. {first_name} {last_name} ({school}) - {time_line}")
+                        
+                    except (ValueError, IndexError) as e:
+                        logger.warning(f"Error parsing Desert Twilight result at line {i}: {e}")
+                        i += 1
+                        continue
+                else:
+                    i += 1
+
+            logger.info(f"Parsed {len(results)} results from Desert Twilight format for {results_title}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error scraping Desert Twilight format: {e}")
+            raise
+
+    def parse_desert_twilight_name(self, name_line: str) -> Tuple[str, str]:
+        """Parse a name from Desert Twilight format."""
+        # Names can have parentheses like "Addison (Addy) Ritzenhein" 
+        # or just be normal "Oliver Horton"
+        name = name_line.strip()
+        
+        # Handle names with parentheses - extract the main name
+        if '(' in name and ')' in name:
+            # Remove the parenthetical part
+            name = re.sub(r'\([^)]*\)', '', name).strip()
+        
+        # Split by space to get first and last name
+        name_parts = name.split()
+        if len(name_parts) >= 2:
+            first_name = name_parts[0]
+            last_name = ' '.join(name_parts[1:])
+        else:
+            # Fallback if only one name part
+            first_name = name_parts[0] if name_parts else "Unknown"
+            last_name = "Unknown"
+        
+        return first_name, last_name
+
+    def parse_desert_twilight_year(self, year_line: str) -> Optional[int]:
+        """Parse graduation year from Desert Twilight year format."""
+        # Format examples: "PR • Yr: 11", "Yr: 12", "SR • Yr: 12", "Yr: SR"
+        year_match = re.search(r'Yr:\s*(\d{1,2}|SR|JR|SO|FR)', year_line)
+        
+        if year_match:
+            year_str = year_match.group(1).strip()
+            current_year = 2025
+            
+            # Convert year to graduation year
+            if year_str in ['12', 'SR']:
+                return current_year
+            elif year_str in ['11', 'JR']:
+                return current_year + 1
+            elif year_str in ['10', 'SO']:
+                return current_year + 2
+            elif year_str in ['9', 'FR']:
+                return current_year + 3
+            elif year_str.isdigit():
+                grade = int(year_str)
+                if grade >= 9 and grade <= 12:
+                    return current_year + (12 - grade)
+        
+        return None
+
+    def scrape_northern_conference_format(self, source: str, is_file: bool = False, race_config: Optional[RaceConfig] = None) -> List[Result]:
+        """Scrape race results using the Northern Conference Championships format."""
+        try:
+            if is_file:
+                if not os.path.exists(source):
+                    logger.error(f"File not found: {source}")
+                    return []
+                with open(source, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            else:
+                response = self.session.get(source, timeout=30)
+                response.raise_for_status()
+                content = response.text
+
+            if not race_config:
+                logger.error("No race configuration provided for Northern Conference format")
+                return []
+            
+            # Determine race number based on race class and gender
+            race_number = getattr(race_config, 'race_number', None)
+            if not race_number:
+                logger.error("No race_number specified in race configuration for Northern Conference format")
+                return []
+
+            logger.info(f"Looking for Northern Conference Race #{race_number}")
+            logger.info(f"Content length: {len(content)} characters")
+            
+            lines = content.splitlines()
+            results = []
+            
+            # Find the race section by looking for "Race #X"
+            race_marker = f"Race #{race_number}"
+            section_start = -1
+            
+            for i, line in enumerate(lines):
+                line_stripped = line.strip()
+                if line_stripped.startswith(race_marker):
+                    section_start = i
+                    logger.info(f"Found race section '{race_marker}' at line {i}")
+                    break
+            
+            if section_start == -1:
+                logger.warning(f"Race section '{race_marker}' not found in content")
+                return []
+            
+            # Find "Individual Results" section after the race marker
+            individual_results_start = -1
+            for i in range(section_start, len(lines)):
+                if "Individual Results" in lines[i]:
+                    individual_results_start = i
+                    logger.info(f"Found 'Individual Results' at line {i}")
+                    break
+            
+            if individual_results_start == -1:
+                logger.warning("'Individual Results' section not found")
+                return []
+            
+            # Parse from individual results section
+            i = individual_results_start + 1
+            
+            # Skip the header line (Athlete, Yr., #, Team, Score, Time, Gap, Avg. Mile)
+            while i < len(lines):
+                line = lines[i].strip()
+                if line and not line.startswith('Athlete'):
+                    break
+                i += 1
+            
+            while i < len(lines):
+                line = lines[i].strip()
+                
+                # Stop at next race section or end of file
+                if line.startswith('Race #') or not line:
+                    if line.startswith('Race #'):
+                        break
+                    i += 1
+                    continue
+                
+                # Try to parse result line
+                # Format: "1	GABRIELSON, Trent	SR	9382	Thompson Valley High School	1	15:28.2	---	4:58.5"
+                # Fields: Place, LASTNAME, firstname, Year, Bib#, Team, Score, Time, Gap, Pace
+                # We care about: Place, name, year (optional), score (for varsity points), time
+                
+                # Split by tabs
+                parts = line.split('\t')
+                
+                if len(parts) >= 8:
+                    try:
+                        place_str = parts[0].strip()
+                        name_str = parts[1].strip()
+                        year_str = parts[2].strip()
+                        # bib is parts[3] - we don't need it
+                        team_str = parts[4].strip()
+                        score_str = parts[5].strip()
+                        time_str = parts[6].strip()
+                        # gap is parts[7], pace is parts[8] - we don't need them
+                        
+                        # Parse place
+                        place = int(place_str)
+                        
+                        # Parse name (format: "LASTNAME, Firstname")
+                        if ',' in name_str:
+                            name_parts = name_str.split(',', 1)
+                            last_name = name_parts[0].strip()
+                            first_name = name_parts[1].strip() if len(name_parts) > 1 else ''
+                        else:
+                            logger.warning(f"Name format unexpected: {name_str}")
+                            i += 1
+                            continue
+                        
+                        # Parse time to seconds
+                        time_seconds = self.parse_time_to_seconds(time_str)
+                        if time_seconds is None:
+                            logger.warning(f"Could not parse time: {time_str} in line: {line}")
+                            i += 1
+                            continue
+
+                        # Normalize names
+                        first_name = self.normalize_name(first_name)
+                        last_name = self.normalize_name(last_name)
+
+                        # Determine varsity points based on race class
+                        varsity_points = 0
+                        if race_config.race_class.lower() == 'varsity':
+                            varsity_points = 1
+                        
+                        athlete = Athlete(
+                            first_name=first_name,
+                            last_name=last_name,
+                            gender=self.map_gender_for_db(race_config.gender),
+                            school=self.normalize_school_name(team_str)
+                        )
+
+                        result = Result(
+                            athlete=athlete,
+                            time_seconds=time_seconds,
+                            place=place,
+                            varsity_points=varsity_points
+                        )
+
+                        results.append(result)
+                        logger.debug(f"Parsed: {place}. {first_name} {last_name} - {team_str} - {time_str}")
+                        
+                    except (ValueError, IndexError) as e:
+                        logger.warning(f"Error parsing Northern Conference line '{line}': {e}")
+                else:
+                    logger.debug(f"Skipping line with insufficient fields: {line}")
+                
+                i += 1
+
+            logger.info(f"Parsed {len(results)} results from Northern Conference format for Race #{race_number}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error scraping Northern Conference format: {e}")
+            raise
+
+    def scrape_longs_peak_format(self, source: str, is_file: bool = False, race_config: Optional[RaceConfig] = None) -> List[Result]:
+        """Scrape race results using the Longs Peak Invitational format."""
+        try:
+            if is_file:
+                if not os.path.exists(source):
+                    logger.error(f"File not found: {source}")
+                    return []
+                with open(source, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            else:
+                response = self.session.get(source, timeout=30)
+                response.raise_for_status()
+                content = response.text
+
+            if not race_config:
+                logger.error("No race configuration provided for Longs Peak format")
+                return []
+
+            logger.info(f"Looking for Longs Peak results")
+            logger.info(f"Content length: {len(content)} characters")
+            
+            lines = content.splitlines()
+            results = []
+            
+            # Find the start of results section (after "High School Boys" or "High School Girls")
+            section_start = -1
+            gender_marker = "High School Boys" if race_config.gender.lower() in ['male', 'boys'] else "High School Girls"
+            
+            for i, line in enumerate(lines):
+                line_stripped = line.strip()
+                if line_stripped == gender_marker:
+                    section_start = i
+                    logger.info(f"Found results section '{gender_marker}' at line {i}")
+                    break
+            
+            if section_start == -1:
+                logger.warning(f"Results section '{gender_marker}' not found in content")
+                return []
+            
+            # Parse from the section start
+            i = section_start + 1
+            
+            while i < len(lines):
+                line = lines[i].strip()
+                
+                # Skip empty lines
+                if not line:
+                    i += 1
+                    continue
+                
+                # Stop at footer or end indicators
+                if 'Number of records:' in line or 'MileSplit PRO' in line:
+                    break
+                
+                # Skip DNS entries (lines starting with "-- --")
+                if line.startswith('-- --'):
+                    logger.debug(f"Skipping DNS entry: {line}")
+                    i += 1
+                    continue
+                
+                # Try to parse result line
+                # Format: "1 1 296 Antheney HERRE Loveland Classical High School 5:19 16:31"
+                # Or:     "10 -- 10 Caleb ESTANOL Estes Park High School 5:44 17:48" (non-scoring)
+                # Or:     "42 (36) 284 Jovian KNOELL Golden View Classical Academy 6:14 19:22" (non-scoring team member beyond top 5)
+                # IMPORTANT: Format is "Firstname LASTNAME" where LASTNAME is in ALL CAPS
+                
+                # Pattern to match result lines
+                result_pattern = r'^(\d+|--)\s+(\d+|--|\(\d+\))\s+(\d+)\s+([A-Za-z][A-Za-z\'\-\.]*(?:\s+[A-Za-z][A-Za-z\'\-\.]*)*)\s+([A-Z][A-Z\'\-\.]+)\s+(.+?)\s+(\d{1,2}:\d{2})\s+(\d{1,2}:\d{2}(?:\.\d+)?)\s*$'
+                match = re.match(result_pattern, line)
+                
+                if match:
+                    place_str = match.group(1).strip()
+                    points_str = match.group(2).strip()
+                    bib = match.group(3).strip()
+                    first_name = match.group(4).strip()  # Firstname (mixed case)
+                    last_name = match.group(5).strip()   # LASTNAME (all caps)
+                    team = match.group(6).strip()
+                    pace = match.group(7).strip()
+                    time_str = match.group(8).strip()
+                    
+                    # Skip entries with no place (DNS)
+                    if place_str == '--':
+                        logger.debug(f"Skipping DNS entry: {line}")
+                        i += 1
+                        continue
+                    
+                    try:
+                        place = int(place_str)
+                        
+                        # Parse time to seconds
+                        time_seconds = self.parse_time_to_seconds(time_str)
+                        if time_seconds is None:
+                            logger.warning(f"Could not parse time: {time_str} in line: {line}")
+                            i += 1
+                            continue
+
+                        # Normalize names
+                        first_name = self.normalize_name(first_name)
+                        last_name = self.normalize_name(last_name)
+
+                        # Determine varsity points (all Longs Peak races are varsity)
+                        varsity_points = 1
+                        
+                        athlete = Athlete(
+                            first_name=first_name,
+                            last_name=last_name,
+                            gender=self.map_gender_for_db(race_config.gender),
+                            school=self.normalize_school_name(team)
+                        )
+
+                        result = Result(
+                            athlete=athlete,
+                            time_seconds=time_seconds,
+                            place=place,
+                            varsity_points=varsity_points
+                        )
+
+                        results.append(result)
+                        logger.debug(f"Parsed: {place}. {first_name} {last_name} - {team} - {time_str}")
+                        
+                    except (ValueError, IndexError) as e:
+                        logger.warning(f"Error parsing Longs Peak line '{line}': {e}")
+                else:
+                    # Log lines that don't match for debugging
+                    if len(line) > 5 and not line.startswith('Place') and 'Pace' not in line and 'Time' not in line:
+                        logger.debug(f"Line didn't match result pattern: '{line}'")
+                
+                i += 1
+
+            logger.info(f"Parsed {len(results)} results from Longs Peak format")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error scraping Longs Peak format: {e}")
+            raise
+
+    def scrape_loveland_sweetheart_format(self, source: str, is_file: bool = False, race_config: Optional[RaceConfig] = None) -> List[Result]:
+        """Scrape race results using the Loveland Sweetheart format."""
+        try:
+            if is_file:
+                if not os.path.exists(source):
+                    logger.error(f"File not found: {source}")
+                    return []
+                with open(source, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            else:
+                response = self.session.get(source, timeout=30)
+                response.raise_for_status()
+                content = response.text
+
+            if not race_config:
+                logger.error("No race configuration provided for Loveland Sweetheart format")
+                return []
+            
+            results_title = getattr(race_config, 'results_title', None)
+            if not results_title:
+                logger.error("No results_title specified in race configuration for Loveland Sweetheart format")
+                return []
+
+            logger.info(f"Looking for Loveland Sweetheart results section: {results_title}")
+            logger.info(f"Content length: {len(content)} characters")
+            
+            lines = content.splitlines()
+            results = []
+            
+            # Find the start of our specific race section
+            section_start = -1
+            logger.info(f"File has {len(lines)} lines, searching for '{results_title}'")
+            
+            for i, line in enumerate(lines):
+                line_stripped = line.strip()
+                if line_stripped == results_title:
+                    section_start = i
+                    logger.info(f"Found section '{results_title}' at line {i}")
+                    break
+            
+            if section_start == -1:
+                logger.warning(f"Results title '{results_title}' not found in content")
+                return []
+            
+            # Parse from the section start
+            i = section_start + 1
+            in_team_results = False
+            in_individual_results = False
+            
+            while i < len(lines):
+                line = lines[i].strip()
+                
+                # Skip empty lines
+                if not line:
+                    i += 1
+                    continue
+                
+                # Check if we hit the start of team results header 
+                if re.match(r'^Rank\s+Team\s+Score\s+Avg', line):
+                    in_team_results = True
+                    in_individual_results = False
+                    logger.debug(f"Entering team results section at line {i}")
+                    i += 1
+                    continue
+                
+                # Check if we hit individual results header
+                if re.match(r'^\s*Pl\s+Athlete\s+Yr\s+Team', line):
+                    in_team_results = False
+                    in_individual_results = True
+                    logger.debug(f"Entering individual results section at line {i}")
+                    i += 1
+                    continue
+                
+                # Skip separator lines (but don't change section state)
+                if re.match(r'^={5,}', line) or re.match(r'^-{5,}', line):
+                    i += 1
+                    continue
+                
+                # Check if we've reached the next race section (stop parsing)
+                next_race_patterns = [
+                    r'^HS Varsity (Boys|Girls) 5K$',
+                    r'^(Boys|Girls) HS Open 5K$'
+                ]
+                
+                for pattern in next_race_patterns:
+                    if re.match(pattern, line):
+                        # Only stop if this is a different race than what we're looking for
+                        if line != results_title:
+                            logger.info(f"Reached next race section at line {i}: {line}")
+                            return results
+                
+                # If we're in team results, skip this line
+                if in_team_results:
+                    logger.debug(f"Skipping team results line: '{line}'")
+                    i += 1
+                    continue
+                
+                # If we're in individual results, try to parse result lines
+                if in_individual_results:
+                    # Skip separator lines
+                    if re.match(r'^={5,}', line) or re.match(r'^-{5,}', line):
+                        logger.debug(f"Skipping separator line: '{line}'")
+                        i += 1
+                        continue
+                    
+                    # Try to parse a result line
+                    # Format: " 57 SPIERS, Sylvia 9 Fort Collins High Sc 49 24:41.0 6:10.1"
+                    # Or:     " 70 BRADFORD, Charleigh 9 Windsor Charter Acad 25:24.0 6:53.1" (no score)
+                    # Handle cases where place might be "--" (DNF)
+                    
+                    # Try pattern with score first  
+                    result_pattern_with_score = r'^\s*(\d+|--)\s+([^,]+),\s*([^\s]+)\s+(\S+)\s+(.+?)\s+(\d+)\s+(\d{1,2}:\d{2}\.\d+)\s+([\d:\.]+|---)\s*$'
+                    match = re.match(result_pattern_with_score, line)
+                    
+                    if not match:
+                        # Try pattern without score (no score number between school and time)
+                        result_pattern_no_score = r'^\s*(\d+|--)\s+([^,]+),\s*([^\s]+)\s+(\S+)\s+(.+?)\s+(\d{1,2}:\d{2}\.\d+)\s+([\d:\.]+|---)\s*$'
+                        match = re.match(result_pattern_no_score, line)
+                    
+                    if match:
+                        place_str = match.group(1).strip()
+                        
+                        # Skip DNF entries (place is "--")
+                        if place_str == '--':
+                            logger.debug(f"Skipping DNF entry: {line}")
+                            i += 1
+                            continue
+                        
+                        try:
+                            place = int(place_str)
+                            last_name = match.group(2).strip()
+                            first_name = match.group(3).strip()
+                            year = match.group(4).strip()
+                            school = match.group(5).strip()
+                            
+                            # Check if we matched the pattern with score or without score
+                            if len(match.groups()) == 8:  # Pattern with score (8 groups)
+                                score = match.group(6).strip()
+                                time_str = match.group(7).strip()
+                            else:  # Pattern without score (7 groups)
+                                score = ""
+                                time_str = match.group(6).strip()
+                            
+                            # Skip if no time (DNF)
+                            if not time_str or time_str == '--':
+                                logger.debug(f"Skipping entry with no time: {line}")
+                                i += 1
+                                continue
+                            
+                            # Parse time to seconds
+                            time_seconds = self.parse_time_to_seconds(time_str)
+                            if time_seconds is None:
+                                logger.warning(f"Could not parse time: {time_str} in line: {line}")
+                                i += 1
+                                continue
+
+                            # Normalize names
+                            first_name = self.normalize_name(first_name)
+                            last_name = self.normalize_name(last_name)
+
+                            # Clean up school name
+                            school = school.replace('High Sc', 'High School')
+                            school = school.replace(' HS', ' High School')
+                            
+                            # Determine if this is varsity or JV based on the race title
+                            varsity_points = 0
+                            if 'Varsity' in results_title:
+                                varsity_points = 1
+                            
+                            athlete = Athlete(
+                                first_name=first_name,
+                                last_name=last_name,
+                                gender=self.map_gender_for_db(race_config.gender),
+                                school=self.normalize_school_name(school)
+                            )
+
+                            result = Result(
+                                athlete=athlete,
+                                time_seconds=time_seconds,
+                                place=place,
+                                varsity_points=varsity_points
+                            )
+
+                            results.append(result)
+                            logger.debug(f"Parsed: {place}. {first_name} {last_name} - {school} - {time_str}")
+                            
+                        except (ValueError, IndexError) as e:
+                            logger.warning(f"Error parsing Loveland Sweetheart line '{line}': {e}")
+                    else:
+                        if len(line.strip()) > 5 and not line.startswith('=') and not line.startswith('-') and 'Pl' not in line and 'Rank' not in line:
+                            logger.info(f"Line didn't match result pattern: '{line.strip()}'")
+                        elif len(line.strip()) > 0:
+                            logger.debug(f"Skipping non-result line: '{line.strip()}'")
+                
+                i += 1
+
+            logger.info(f"Parsed {len(results)} results from Loveland Sweetheart format for {results_title}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error scraping Loveland Sweetheart format: {e}")
+            raise
 
     def parse_pre_formatted_results(self, text: str) -> List[Result]:
         """Parse race results from pre-formatted text (MileSplit raw format)."""
@@ -1163,8 +2068,10 @@ class MileSplitScraper:
                         key = (first_name, last_name, school, time_seconds, place)
                         existing_set.add(key)
                     
-                    new_results_count = 0
+                    # Bulk process new results for better performance
+                    new_results = []
                     skipped_results_count = 0
+                    
                     for result in results:
                         # Normalize result data for comparison
                         first_name = result.athlete.first_name.strip().lower()
@@ -1176,22 +2083,27 @@ class MileSplitScraper:
                         
                         if result_key not in existing_set:
                             athlete_id = self.get_or_create_athlete(result.athlete)
-                            conn.execute(
-                                text("""
-                                    INSERT INTO results (race_id, athlete_id, time_seconds, place, varsity_points)
-                                    VALUES (:race_id, :athlete_id, :time_seconds, :place, :varsity_points)
-                                """),
-                                {
-                                    "race_id": race_id,
-                                    "athlete_id": athlete_id,
-                                    "time_seconds": result.time_seconds,
-                                    "place": result.place,
-                                    "varsity_points": result.varsity_points
-                                }
-                            )
-                            new_results_count += 1
+                            new_results.append({
+                                "race_id": race_id,
+                                "athlete_id": athlete_id,
+                                "time_seconds": result.time_seconds,
+                                "place": result.place,
+                                "varsity_points": result.varsity_points
+                            })
                         else:
                             skipped_results_count += 1
+                    
+                    # Bulk insert new results
+                    if new_results:
+                        conn.execute(
+                            text("""
+                                INSERT INTO results (race_id, athlete_id, time_seconds, place, varsity_points)
+                                VALUES (:race_id, :athlete_id, :time_seconds, :place, :varsity_points)
+                            """),
+                            new_results
+                        )
+                    
+                    new_results_count = len(new_results)
                     
                     if new_results_count > 0:
                         logger.info(f"Added {new_results_count} new results for race: {race_config.race_name}")
@@ -1256,6 +2168,7 @@ class MileSplitScraper:
         school_mappings = {
             'Fort Collins': 'Fort Collins High School',
             'Fort Collins HS': 'Fort Collins High School',
+            'Fort Collins High Sc': 'Fort Collins High School',
             'FCHS': 'Fort Collins High School',
             'Fossil Ridge HS': 'Fossil Ridge High School',
             'Fossil Ridge': 'Fossil Ridge High School',
@@ -1342,8 +2255,9 @@ def main():
             logger.error(f"Error processing race {race_config.race_name}: {e}")
             continue
         
-        # Be respectful to the server
-        time.sleep(2)
+        # Only sleep for URL-based requests to be respectful to servers
+        if race_config.url and not race_config.file:
+            time.sleep(2)
     
     logger.info("Scraping completed")
 
