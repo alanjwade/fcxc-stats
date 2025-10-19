@@ -85,6 +85,8 @@
         .time-display {
             font-family: 'Courier New', monospace;
             font-weight: bold;
+            line-height: 1.5;
+            white-space: nowrap;
         }
         
         .pr-badge {
@@ -113,6 +115,24 @@
         
         .table-striped > tbody > tr:nth-of-type(odd) > td {
             background-color: rgba(102, 51, 153, 0.05);
+        }
+        
+        .crown-pr {
+            font-size: 0.9em;
+            margin-left: 4px;
+            display: inline;
+            vertical-align: baseline;
+            line-height: 1;
+            animation: subtle-glow 2s ease-in-out infinite;
+        }
+        
+        @keyframes subtle-glow {
+            0%, 100% {
+                filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.5));
+            }
+            50% {
+                filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.8));
+            }
         }
     </style>
 </head>

@@ -107,6 +107,9 @@
                                 <td>
                                     <span class="time-display text-primary">
                                         {{ format_time(result.time_seconds) }}
+                                        {% if pr_times.get(result.distance) == result.time_seconds %}
+                                            <span class="crown-pr" title="Personal Record">👑</span>
+                                        {% endif %}
                                     </span>
                                 </td>
                                 <td>

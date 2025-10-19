@@ -49,6 +49,9 @@ class Athlete:
     gender: str
     school: str
     graduation_year: Optional[int] = None
+    
+    def __post_init__(self):
+        pass
 
 @dataclass
 class Result:
@@ -576,6 +579,7 @@ class MileSplitScraper:
                 # "  1 John Doe           12 School Name       16:42.45    1"
                 # "  1 John Doe           12 School Name       16:42.45"
                 result_pattern = r'^\s*(\d+)\s+([A-Za-z\'\-\.\s]+?)\s+(\d{1,2})\s+(.+?)\s+(\d{1,2}:\d{2}\.\d{2})(?:\s+(\d+))?\s*$'
+                
                 match = re.match(result_pattern, line)
                 
                 if match:
@@ -596,6 +600,7 @@ class MileSplitScraper:
 
                         # Parse name into first and last
                         name_parts = name.split()
+                        
                         if len(name_parts) >= 2:
                             first_name = name_parts[0]
                             last_name = ' '.join(name_parts[1:])
@@ -842,6 +847,8 @@ class MileSplitScraper:
     def scrape_race_results(self, source: str, is_file: bool = False, algorithm: str = 'default', gender: str = 'unknown', race_config: Optional[RaceConfig] = None) -> List[Result]:
         """Scrape race results using the selected algorithm."""
         logger.info(f"Algorithm selected: '{algorithm}' for source: {source}")
+        if race_config:
+            logger.info(f"Race: {race_config.race_name}, results_title: {getattr(race_config, 'results_title', 'N/A')}")
         if algorithm == 'john_martin':
             return self.scrape_john_martin_format(source, is_file, gender=gender)
         elif algorithm == 'thornton_combined':
@@ -1493,8 +1500,8 @@ class MileSplitScraper:
                     i += 1
                     continue
                 
-                # Check if we hit individual results header
-                if re.match(r'^\s*Pl\s+Athlete\s+Yr\s+Team', line):
+                # Check if we hit individual results header (more flexible pattern)
+                if re.match(r'^\s*Pl\s+Athlete\s+Yr\s+Team', line, re.IGNORECASE):
                     in_team_results = False
                     in_individual_results = True
                     logger.debug(f"Entering individual results section at line {i}")
@@ -1506,10 +1513,22 @@ class MileSplitScraper:
                     i += 1
                     continue
                 
+                # If we're in team results, skip this line (don't try to parse team score lines as results)
+                if in_team_results:
+                    logger.debug(f"Skipping team results line: '{line}'")
+                    i += 1
+                    continue
+                
                 # Check if we've reached the next race section (stop parsing)
+                # Stop parsing when we hit other race headings. Include flexible patterns
+                # that match 'Boys 5000 Meters', 'Girls 5000 Meters', 'HS Varsity Boys 5K', etc.
                 next_race_patterns = [
                     r'^HS Varsity (Boys|Girls) 5K$',
-                    r'^(Boys|Girls) HS Open 5K$'
+                    r'^(Boys|Girls) HS Open 5K$',
+                    r'^(Boys|Girls)\s+\d{1,3},?\d*\s+Meters$',
+                    r'^(Boys|Girls)\s+\d{1,3}m\s+?$',
+                    r'^(Boys|Girls)\s+5000\s+Meters$',
+                    r'^(Boys|Girls)\s+5K$'
                 ]
                 
                 for pattern in next_race_patterns:
@@ -1518,12 +1537,6 @@ class MileSplitScraper:
                         if line != results_title:
                             logger.info(f"Reached next race section at line {i}: {line}")
                             return results
-                
-                # If we're in team results, skip this line
-                if in_team_results:
-                    logger.debug(f"Skipping team results line: '{line}'")
-                    i += 1
-                    continue
                 
                 # If we're in individual results, try to parse result lines
                 if in_individual_results:
@@ -1534,18 +1547,45 @@ class MileSplitScraper:
                         continue
                     
                     # Try to parse a result line
-                    # Format: " 57 SPIERS, Sylvia 9 Fort Collins High Sc 49 24:41.0 6:10.1"
-                    # Or:     " 70 BRADFORD, Charleigh 9 Windsor Charter Acad 25:24.0 6:53.1" (no score)
+                    # Two possible formats:
+                    # Hawk JV format: "Place LASTNAME, Firstname School Score Time AvgMile AvgKm"
+                    #   Example: " 1 BARRIOS, Noah Niwot High School 1 15:56.12 5:07.4 3:11.2"
+                    # Loveland Sweetheart format: "Place LASTNAME, Firstname Yr School Score Time Gap"
+                    #   Example: " 1 TORRES, Brynn 9 Loveland High School 1 18:30.9 ---"
                     # Handle cases where place might be "--" (DNF)
                     
-                    # Try pattern with score first  
-                    result_pattern_with_score = r'^\s*(\d+|--)\s+([^,]+),\s*([^\s]+)\s+(\S+)\s+(.+?)\s+(\d+)\s+(\d{1,2}:\d{2}\.\d+)\s+([\d:\.]+|---)\s*$'
-                    match = re.match(result_pattern_with_score, line)
+                    # Try Loveland Sweetheart format first (with Yr field and Gap at end)
+                    # Pattern: Place LASTNAME, Firstname Yr School Score Time Gap
+                    # Gap is either "---" or a time offset like "19.8" or "1:26.0"
+                    # Key: Loveland times have MM:SS.S format (2 digits for minutes, 1 decimal)
+                    # Hawk times have MM:SS.SS format (2 decimals)
+                    # Hawk paces have M:SS.S format (1 digit for minutes) which we must NOT match
+                    # Yr field should be 1-2 digits (9, 10, 11, 12) or grade abbreviations (FR, SO, JR, SR)
+                    result_pattern_with_yr_score = r'^\s*(\d+|--)\s+([^,]+),\s*(\S+)\s+(\d{1,2}|FR|SO|JR|SR)\s+(.+?)\s+(\d+)\s+(\d{2}:\d{2}\.\d{1})\s+(---|[\d:\.]+)\s*$'
+                    match = re.match(result_pattern_with_yr_score, line)
+                    pattern_type = 'loveland_with_score'
                     
                     if not match:
-                        # Try pattern without score (no score number between school and time)
-                        result_pattern_no_score = r'^\s*(\d+|--)\s+([^,]+),\s*([^\s]+)\s+(\S+)\s+(.+?)\s+(\d{1,2}:\d{2}\.\d+)\s+([\d:\.]+|---)\s*$'
+                        # Try Loveland Sweetheart format without score
+                        # Pattern: Place LASTNAME, Firstname Yr School Time Gap
+                        result_pattern_with_yr_no_score = r'^\s*(\d+|--)\s+([^,]+),\s*(\S+)\s+(\d{1,2}|FR|SO|JR|SR)\s+(.+?)\s+(\d{2}:\d{2}\.\d{1})\s+(---|[\d:\.]+)\s*$'
+                        match = re.match(result_pattern_with_yr_no_score, line)
+                        pattern_type = 'loveland_no_score'
+                    
+                    if not match:
+                        # Try Hawk JV format with score (school followed by score number, then time and paces)
+                        # Pattern: Place LASTNAME, Firstname...More School Score Time Pace1 Pace2
+                        # Match everything after firstname, then look for score (number) before time
+                        result_pattern_with_score = r'^\s*(\d+|--)\s+([^,]+),\s*(.+?)\s+(\d+)\s+(\d{1,2}:\d{2}\.\d+)\s+[\d:\.]+\s+[\d:\.]+\s*$'
+                        match = re.match(result_pattern_with_score, line)
+                        pattern_type = 'hawk_with_score'
+                    
+                    if not match:
+                        # Try Hawk JV format without score (school followed directly by time and paces)
+                        # Pattern: Place LASTNAME, Firstname...More School Time Pace1 Pace2
+                        result_pattern_no_score = r'^\s*(\d+|--)\s+([^,]+),\s*(.+?)\s+(\d{1,2}:\d{2}\.\d+)\s+[\d:\.]+\s+[\d:\.]+\s*$'
                         match = re.match(result_pattern_no_score, line)
+                        pattern_type = 'hawk_no_score'
                     
                     if match:
                         place_str = match.group(1).strip()
@@ -1559,17 +1599,40 @@ class MileSplitScraper:
                         try:
                             place = int(place_str)
                             last_name = match.group(2).strip()
-                            first_name = match.group(3).strip()
-                            year = match.group(4).strip()
-                            school = match.group(5).strip()
                             
-                            # Check if we matched the pattern with score or without score
-                            if len(match.groups()) == 8:  # Pattern with score (8 groups)
+                            # Extract fields based on pattern type
+                            if pattern_type == 'loveland_with_score':
+                                # Groups: 1=place, 2=last, 3=first, 4=yr, 5=school, 6=score, 7=time, 8=gap
+                                first_name = match.group(3).strip()
+                                yr = match.group(4).strip()  # Not used but present
+                                school = match.group(5).strip()
                                 score = match.group(6).strip()
                                 time_str = match.group(7).strip()
-                            else:  # Pattern without score (7 groups)
+                            elif pattern_type == 'loveland_no_score':
+                                # Groups: 1=place, 2=last, 3=first, 4=yr, 5=school, 6=time, 7=gap
+                                first_name = match.group(3).strip()
+                                yr = match.group(4).strip()  # Not used but present
+                                school = match.group(5).strip()
                                 score = ""
                                 time_str = match.group(6).strip()
+                            elif pattern_type == 'hawk_with_score':
+                                # Groups: 1=place, 2=last, 3=first+school, 4=score, 5=time
+                                # Need to split first+school - first name is first word, rest is school
+                                combined = match.group(3).strip()
+                                parts = combined.split(None, 1)  # Split on first whitespace
+                                first_name = parts[0] if len(parts) > 0 else ""
+                                school = parts[1] if len(parts) > 1 else ""
+                                score = match.group(4).strip()
+                                time_str = match.group(5).strip()
+                            else:  # hawk_no_score
+                                # Groups: 1=place, 2=last, 3=first+school, 4=time
+                                # Need to split first+school - first name is first word, rest is school
+                                combined = match.group(3).strip()
+                                parts = combined.split(None, 1)  # Split on first whitespace
+                                first_name = parts[0] if len(parts) > 0 else ""
+                                school = parts[1] if len(parts) > 1 else ""
+                                score = ""
+                                time_str = match.group(4).strip()
                             
                             # Skip if no time (DNF)
                             if not time_str or time_str == '--':
@@ -1588,9 +1651,10 @@ class MileSplitScraper:
                             first_name = self.normalize_name(first_name)
                             last_name = self.normalize_name(last_name)
 
-                            # Clean up school name
-                            school = school.replace('High Sc', 'High School')
-                            school = school.replace(' HS', ' High School')
+                            # Clean up school name (only if it doesn't already end with "High School")
+                            if not school.endswith('High School'):
+                                school = school.replace('High Sc', 'High School')
+                                school = school.replace(' HS', ' High School')
                             
                             # Determine if this is varsity or JV based on the race title
                             varsity_points = 0
@@ -1978,7 +2042,8 @@ class MileSplitScraper:
                 }
             )
             conn.commit()
-            return str(result.fetchone()[0])
+            athlete_id = str(result.fetchone()[0])
+            return athlete_id
 
     def store_race_results(self, race_config: RaceConfig, results: List[Result]):
         """Store race results in the database, avoiding duplicates."""

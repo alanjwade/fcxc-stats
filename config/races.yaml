@@ -14,6 +14,79 @@
 # Use either 'url' for online scraping or 'file' for local HTML files
 
 races:
+  # Liberty Bell Cross Country Invitational 2025 - September 13, 2025
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "Varsity Boys"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Mens 5,000 Meters Saucony Sweepstakes Varsity Results"
+
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "Varsity Girls"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Womens 5,000 Meters Runners Roost Sweepstakes Varsity Results"
+
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "JV Boys"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "boys"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Mens 5,000 Meters Sweepstakes JV Results"
+
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "JV Girls"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "girls"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Womens 5,000 Meters Sweepstakes JV Results"
+
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "Open Boys"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "boys"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Mens 5,000 Meters Sweepstakes Open Results"
+
+  - meet_name: "Liberty Bell Cross Country Invitational 2025"
+    race_name: "Open Girls"
+    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
+    distance: "5K"
+    race_class: "jv"
+    gender: "girls"
+    venue: "Heritage High School XC Course"
+    date: "2025-09-13"
+    season: "2025"
+    algorithm: raw_combined
+    results_title: "Womens 5,000 Meters Sweepstakes Open Results"
+
   # Windsor Wizards Invitational 2025 - September 21, 2025
   - meet_name: "Windsor Wizards Invitational 2025"
     race_name: "Varsity Boys"
@@ -244,79 +317,6 @@ races:
     algorithm: default
     
 
-  # Liberty Bell Cross Country Invitational 2025 - September 13, 2025
-  - meet_name: "Liberty Bell Cross Country Invitational 2025"
-    race_name: "Varsity Boys"
-    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
-    distance: "5K"
-    race_class: "varsity"
-    gender: "boys"
-    venue: "Heritage High School XC Course"
-    date: "2025-09-13"
-    season: "2025"
-    algorithm: raw_combined
-    results_title: "Mens 5,000 Meters Saucony Sweepstakes Varsity Results"
-
-  - meet_name: "Liberty Bell Cross Country Invitational 2025"
-    race_name: "Varsity Girls"
-    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
-    distance: "5K"
-    race_class: "varsity"
-    gender: "girls"
-    venue: "Heritage High School XC Course"
-    date: "2025-09-13"
-    season: "2025"
-    algorithm: raw_combined
-    results_title: "Womens 5,000 Meters Runners Roost Sweepstakes Varsity Results"
-
-  - meet_name: "Liberty Bell Cross Country Invitational 2025"
-    race_name: "JV Boys"
-    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
-    distance: "5K"
-    race_class: "jv"
-    gender: "boys"
-    venue: "Heritage High School XC Course"
-    date: "2025-09-13"
-    season: "2025"
-    algorithm: raw_combined
-    results_title: "Mens 5,000 Meters Sweepstakes JV Results"
-
-  - meet_name: "Liberty Bell Cross Country Invitational 2025"
-    race_name: "JV Girls"
-    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
-    distance: "5K"
-    race_class: "jv"
-    gender: "girls"
-    venue: "Heritage High School XC Course"
-    date: "2025-09-13"
-    season: "2025"
-    algorithm: raw_combined
-    results_title: "Womens 5,000 Meters Sweepstakes JV Results"
-
-  - meet_name: "Liberty Bell Cross Country Invitational 2025"
-    race_name: "Open Boys"
-    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
-    distance: "5K"
-    race_class: "jv"
-    gender: "boys"
-    venue: "Heritage High School XC Course"
-    date: "2025-09-13"
-    season: "2025"
-    algorithm: raw_combined
-    results_title: "Mens 5,000 Meters Sweepstakes Open Results"
-
-  - meet_name: "Liberty Bell Cross Country Invitational 2025"
-    race_name: "Open Girls"
-    file: "pages/Liberty Bell Cross Country Invitational 2025 - Complete (Raw).html"
-    distance: "5K"
-    race_class: "jv"
-    gender: "girls"
-    venue: "Heritage High School XC Course"
-    date: "2025-09-13"
-    season: "2025"
-    algorithm: raw_combined
-    results_title: "Womens 5,000 Meters Sweepstakes Open Results"
-
 # Example of raw_combined algorithm configuration
 # This algorithm parses results from a combined HTML file using a results_title to find specific sections
 # Uncomment and modify these entries to use the raw_combined algorithm:
@@ -418,6 +418,31 @@ races:
     season: "2025"
     algorithm: loveland_sweetheart
     results_title: "HS Varsity Girls 5K"
+
+  # Hawk JV Championships 2025 - October 17, 2025
+  - meet_name: "Hawk JV Championships 2025"
+    race_name: "JV Boys"
+    file: "pages/Hawk JV Champs 2025.txt"
+    distance: "5K"
+    race_class: "jv"
+    gender: "boys"
+    venue: "Adams County Regional Park XC Course"
+    date: "2025-10-17"
+    season: "2025"
+    algorithm: loveland_sweetheart
+    results_title: "Boys 5000 Meters"
+
+  - meet_name: "Hawk JV Championships 2025"
+    race_name: "JV Girls"
+    file: "pages/Hawk JV Champs 2025.txt"
+    distance: "5K"
+    race_class: "jv"
+    gender: "girls"
+    venue: "Adams County Regional Park XC Course"
+    date: "2025-10-17"
+    season: "2025"
+    algorithm: loveland_sweetheart
+    results_title: "Girls 5000 Meters"
 
   - meet_name: "Loveland Sweetheart 2025"
     race_name: "JV Boys"

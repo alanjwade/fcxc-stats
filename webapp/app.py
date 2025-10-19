@@ -536,6 +536,9 @@ def athlete_stats(athlete_id):
             
             prs = conn.execute(prs_query, {'athlete_id': athlete_id}).fetchall()
             
+            # Create a dictionary of PR times by distance for easy lookup
+            pr_times = {pr.distance: pr.pr_seconds for pr in prs}
+            
             # Calculate number of varsity races run
             varsity_races = sum(1 for result in results if result.race_class == 'varsity')
             
@@ -544,6 +547,7 @@ def athlete_stats(athlete_id):
                                  athlete_id=athlete_id,
                                  results=results,
                                  prs=prs,
+                                 pr_times=pr_times,
                                  varsity_races=varsity_races,
                                  format_time=format_time)
     
