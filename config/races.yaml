@@ -444,6 +444,29 @@ races:
     algorithm: loveland_sweetheart
     results_title: "Girls 5000 Meters"
 
+  # Colorado 5A Region 4 Cross Country 2025 - October 23, 2025
+  - meet_name: "Colorado 5A Region 4 Cross Country 2025"
+    race_name: "Varsity Boys"
+    file: "pages/regionals_2025_5a_region_4.html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Fossil Ridge High School"
+    date: "2025-10-23"
+    season: "2025"
+    algorithm: regionals_table
+
+  - meet_name: "Colorado 5A Region 4 Cross Country 2025"
+    race_name: "Varsity Girls"
+    file: "pages/regionals_2025_5a_region_4.html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Fossil Ridge High School"
+    date: "2025-10-23"
+    season: "2025"
+    algorithm: regionals_table
+
   - meet_name: "Loveland Sweetheart 2025"
     race_name: "JV Boys"
     file: "pages/Loveland Sweetheart 2025.txt"

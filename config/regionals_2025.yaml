@@ -1,0 +1,15 @@
+meets:
+  - name: "Colorado 5A Region 4 Cross Country 2025"
+    date: "2025-10-XX"  # Update with actual date
+    season: "2025"
+    venue: "TBD"  # Update with actual venue
+    source_file: "scraper/pages/regionals_2025_5a_region_4.html"
+    races:
+      - name: "Boys Varsity"
+        distance: 5000
+        gender: "male"
+        algorithm: "regionals_table"
+      - name: "Girls Varsity"
+        distance: 5000
+        gender: "female"
+        algorithm: "regionals_table"

@@ -5,3 +5,4 @@ pyyaml==6.0.1
 psycopg2-binary==2.9.7
 sqlalchemy==2.0.21
 alembic==1.12.0
+playwright==1.40.0

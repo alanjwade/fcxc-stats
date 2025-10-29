@@ -865,6 +865,8 @@ class MileSplitScraper:
             return self.scrape_longs_peak_format(source, is_file, race_config=race_config)
         elif algorithm == 'northern_conference':
             return self.scrape_northern_conference_format(source, is_file, race_config=race_config)
+        elif algorithm == 'regionals_table':
+            return self.scrape_regionals_table_format(source, is_file, race_config=race_config)
         # Default algorithm
         try:
             if is_file:
@@ -1435,7 +1437,163 @@ class MileSplitScraper:
             logger.error(f"Error scraping Longs Peak format: {e}")
             raise
 
+    def scrape_regionals_table_format(self, source: str, is_file: bool = False, race_config: Optional[RaceConfig] = None) -> List[Result]:
+        """Scrape race results using the Regionals HTML table format (MileSplit formatted results)."""
+        try:
+            if is_file:
+                if not os.path.exists(source):
+                    logger.error(f"File not found: {source}")
+                    return []
+                with open(source, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+            else:
+                response = self.session.get(source, timeout=30)
+                response.raise_for_status()
+                html_content = response.text
+
+            if not race_config:
+                logger.error("No race configuration provided for Regionals format")
+                return []
+
+            soup = BeautifulSoup(html_content, 'html.parser')
+            results = []
+            
+            # Determine which race to parse based on gender
+            if race_config.gender.lower() in ['male', 'boys', 'm']:
+                race_title = "Boys 5000 Meter Run Finals"
+                table_id = "m5000mfinalsFinals"
+            else:
+                race_title = "Girls 5000 Meter Run Finals"
+                table_id = "f5000mfinalsFinals"
+            
+            logger.info(f"Looking for race: {race_title} (table id: {table_id})")
+            
+            # Find the table by ID
+            results_table = soup.find('table', {'id': table_id})
+            
+            if not results_table:
+                logger.error(f"Table with id '{table_id}' not found")
+                return []
+            
+            logger.info(f"Found results table for {race_title}")
+            
+            # Parse the table rows
+            tbody = results_table.find('tbody')
+            if not tbody:
+                logger.error("Table body not found")
+                return []
+            
+            rows = tbody.find_all('tr')
+            logger.info(f"Found {len(rows)} rows in table")
+            
+            for row in rows:
+                try:
+                    # Extract place
+                    place_cell = row.find('td', class_='place')
+                    if not place_cell:
+                        continue
+                    
+                    place_text = place_cell.get_text(strip=True)
+                    if not place_text or not place_text.isdigit():
+                        continue
+                    place = int(place_text)
+                    
+                    # Extract athlete name
+                    athlete_cell = row.find('td', class_='athlete')
+                    if not athlete_cell:
+                        continue
+                    
+                    athlete_link = athlete_cell.find('a')
+                    if not athlete_link:
+                        continue
+                    
+                    full_name = athlete_link.get_text(strip=True)
+                    
+                    # Parse name (format: "Firstname Lastname" or "Firstname Middle Lastname")
+                    name_parts = full_name.split()
+                    if len(name_parts) < 2:
+                        logger.warning(f"Invalid name format: {full_name}")
+                        continue
+                    
+                    first_name = name_parts[0]
+                    last_name = ' '.join(name_parts[1:])
+                    
+                    # Extract grade
+                    grade_cell = row.find('td', class_='grade')
+                    grade_text = grade_cell.get_text(strip=True) if grade_cell else None
+                    graduation_year = None
+                    if grade_text and grade_text.isdigit():
+                        grade = int(grade_text)
+                        current_year = int(race_config.season)
+                        if 9 <= grade <= 12:
+                            graduation_year = current_year + (12 - grade)
+                    
+                    # Extract school/team
+                    team_cell = row.find('td', class_='team')
+                    if not team_cell:
+                        continue
+                    
+                    team_link = team_cell.find('a')
+                    school = team_link.get_text(strip=True) if team_link else team_cell.get_text(strip=True)
+                    
+                    # Extract time
+                    finish_cell = row.find('td', class_='finish')
+                    if not finish_cell:
+                        continue
+                    
+                    time_str = finish_cell.get_text(strip=True)
+                    time_seconds = self.parse_time_to_seconds(time_str)
+                    
+                    if time_seconds is None:
+                        logger.warning(f"Could not parse time: {time_str}")
+                        continue
+                    
+                    # Extract points
+                    points_cell = row.find('td', class_='point')
+                    varsity_points = 0
+                    if points_cell:
+                        points_text = points_cell.get_text(strip=True)
+                        if points_text and points_text.isdigit():
+                            varsity_points = int(points_text)
+                    
+                    # Normalize names
+                    first_name = self.normalize_name(first_name)
+                    last_name = self.normalize_name(last_name)
+                    
+                    # Determine gender
+                    gender = 'male' if race_config.gender.lower() in ['male', 'boys', 'm'] else 'female'
+                    
+                    # Create athlete and result objects
+                    athlete = Athlete(
+                        first_name=first_name,
+                        last_name=last_name,
+                        gender=gender,
+                        school=school,
+                        graduation_year=graduation_year
+                    )
+                    
+                    result = Result(
+                        athlete=athlete,
+                        time_seconds=time_seconds,
+                        place=place,
+                        varsity_points=varsity_points
+                    )
+                    
+                    results.append(result)
+                    
+                except Exception as e:
+                    logger.warning(f"Error parsing row: {e}")
+                    continue
+            
+            logger.info(f"Parsed {len(results)} results from Regionals table format")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error scraping Regionals table format: {e}")
+            raise
+
     def scrape_loveland_sweetheart_format(self, source: str, is_file: bool = False, race_config: Optional[RaceConfig] = None) -> List[Result]:
+
         """Scrape race results using the Loveland Sweetheart format."""
         try:
             if is_file:

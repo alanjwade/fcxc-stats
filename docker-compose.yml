@@ -74,6 +74,7 @@ services:
       - db
     volumes:
       - ./config:/app/config
+      - ./scraper/pages:/app/pages
     networks:
       - fcxc_network
     profiles:
