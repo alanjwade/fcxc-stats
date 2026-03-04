@@ -451,7 +451,7 @@ races:
     distance: "5K"
     race_class: "varsity"
     gender: "boys"
-    venue: "Fossil Ridge High School"
+    venue: "Monfort Park"
     date: "2025-10-23"
     season: "2025"
     algorithm: regionals_table
@@ -462,8 +462,31 @@ races:
     distance: "5K"
     race_class: "varsity"
     gender: "girls"
-    venue: "Fossil Ridge High School"
+    venue: "Monfort Park"
     date: "2025-10-23"
+    season: "2025"
+    algorithm: regionals_table
+
+  # Colorado 5A State Cross Country Championships 2025 - November 1, 2025
+  - meet_name: "Colorado 5A State Cross Country Championships 2025"
+    race_name: "Varsity Boys"
+    file: "pages/State Championship 2025 Boys.html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "boys"
+    venue: "Norris Penrose Event Center"
+    date: "2025-11-01"
+    season: "2025"
+    algorithm: regionals_table
+
+  - meet_name: "Colorado 5A State Cross Country Championships 2025"
+    race_name: "Varsity Girls"
+    file: "pages/State Championship 2025 Girls.html"
+    distance: "5K"
+    race_class: "varsity"
+    gender: "girls"
+    venue: "Norris Penrose Event Center"
+    date: "2025-11-01"
     season: "2025"
     algorithm: regionals_table
 

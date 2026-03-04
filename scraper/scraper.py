@@ -1461,21 +1461,27 @@ class MileSplitScraper:
             # Determine which race to parse based on gender
             if race_config.gender.lower() in ['male', 'boys', 'm']:
                 race_title = "Boys 5000 Meter Run Finals"
-                table_id = "m5000mfinalsFinals"
+                table_id_prefix = "m5000mfinalsFinals"
             else:
                 race_title = "Girls 5000 Meter Run Finals"
-                table_id = "f5000mfinalsFinals"
+                table_id_prefix = "f5000mfinalsFinals"
             
-            logger.info(f"Looking for race: {race_title} (table id: {table_id})")
+            logger.info(f"Looking for race: {race_title} (table id prefix: {table_id_prefix})")
             
-            # Find the table by ID
-            results_table = soup.find('table', {'id': table_id})
+            # Find the table by ID (exact match or prefix match)
+            results_table = soup.find('table', {'id': table_id_prefix})
+            if not results_table:
+                # Try finding by ID prefix (for State Championships with suffix like "Finals16")
+                for table in soup.find_all('table', class_='eventTable'):
+                    if table.get('id', '').startswith(table_id_prefix):
+                        results_table = table
+                        break
             
             if not results_table:
-                logger.error(f"Table with id '{table_id}' not found")
+                logger.error(f"Table with id starting with '{table_id_prefix}' not found")
                 return []
             
-            logger.info(f"Found results table for {race_title}")
+            logger.info(f"Found results table for {race_title} (id: {results_table.get('id')})")
             
             # Parse the table rows
             tbody = results_table.find('tbody')
