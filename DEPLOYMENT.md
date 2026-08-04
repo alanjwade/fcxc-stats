@@ -1,121 +1,112 @@
-# Cross Country Statistics Tracker
+# Cross Country Statistics Tracker — Deployment Guide
 
-## Deployment Instructions
+## Overview
 
-### Prerequisites
-- Docker and Docker Compose installed
-- Git (for version control)
+- **Scraper**: Runs standalone on your dev machine using a Python virtual environment
+- **Webapp**: Runs as a Docker container deployed to `/home/alan/homelab/fcxc-stats/`
+- **Reverse Proxy / TLS**: Handled externally by the homelab Docker orchestration
 
-### Quick Start
+## Scraper Setup
 
-1. **Initialize the project:**
-   ```bash
-   ./deploy.sh init
-   ```
-
-2. **Edit your configuration:**
-   - Update `.env` with your database credentials
-   - Edit `config/races.yaml` with your actual race data
-
-3. **Start the application:**
-   ```bash
-   ./deploy.sh start
-   ```
-
-4. **Import race data:**
-   ```bash
-   ./deploy.sh scrape
-   ```
-
-5. **Access the dashboard:**
-   Open http://localhost in your browser
-
-### Configuration Files
-
-#### `.env`
-Contains environment variables for the application:
-- Database credentials
-- Flask configuration
-- Secret keys
-
-#### `config/races.yaml`
-Defines the races to scrape:
-```yaml
-races:
-  - name: "Meet Name"
-    url: "https://co.milesplit.com/meets/.../formatted/"
-    distance: "5K"
-    class: "varsity"
-    gender: "mixed"
-    venue: "Venue Name"
-    date: "YYYY-MM-DD"
-    season: "YYYY"
-```
-
-### Available Commands
+### One-time setup
 
 ```bash
-./deploy.sh start     # Start the web application
-./deploy.sh stop      # Stop the web application
-./deploy.sh restart   # Restart the web application
-./deploy.sh scrape    # Run the data scraper
-./deploy.sh logs      # View application logs
-./deploy.sh backup    # Backup the database
-./deploy.sh init      # Initialize environment files
+cd scraper
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### Architecture
+### Running the scraper
 
-The application consists of:
-
-1. **PostgreSQL Database** - Stores all race and athlete data
-2. **Python Scraper** - Extracts data from MileSplit.com
-3. **Flask Web App** - Provides the dashboard interface
-4. **Nginx Reverse Proxy** - Handles web traffic
-
-### Features
-
-- **CSV Export**: Download athlete performance data
-- **Team Statistics**: View best times by gender
-- **Athlete Profiles**: Individual statistics and progress tracking
-- **Responsive Design**: Works on desktop and mobile devices
-
-### Troubleshooting
-
-**Database Connection Issues:**
 ```bash
-docker-compose logs db
+cd scraper
+source .venv/bin/activate
+
+# Standard run (incremental — skips existing data)
+DATABASE_URL=sqlite:///$(pwd)/../data/fcxc_stats.db python scraper.py --config ../config/races.yaml
+
+# Full refresh (clear + re-scrape)
+DATABASE_URL=sqlite:///$(pwd)/../data/fcxc_stats.db python scraper.py --clear-db --config ../config/races.yaml
 ```
 
-**Web Application Issues:**
+The scraper writes to `data/fcxc_stats.db` in the project root. This same
+database is mounted into the webapp container.
+
+### Downloading MileSplit pages
+
+For pages that need JavaScript rendering:
+
 ```bash
-docker-compose logs webapp
+cd scraper
+source .venv/bin/activate
+python download_page.py "URL" "pages/output.html"
 ```
 
-**Scraper Issues:**
+Then reference the file in `config/races.yaml` with the `file:` key.
+
+## Webapp Deployment
+
+### Deploy to homelab
+
 ```bash
-docker-compose logs scraper
+./deploy.sh deploy    # Copies webapp/, config/, and docker-compose.yml to homelab
+./deploy.sh start     # Builds and starts the container
 ```
 
-**Reset Everything:**
+### Other commands
+
 ```bash
-docker-compose down -v
-docker-compose up -d
+./deploy.sh stop      # Stop the webapp
+./deploy.sh restart   # Restart the webapp
+./deploy.sh logs      # Tail webapp logs
+./deploy.sh backup    # Copy the SQLite database to a timestamped backup file
 ```
 
-### Production Considerations
+### Manual deployment
 
-- Change default passwords in `.env`
-- Set up SSL certificates for HTTPS
-- Configure backups using `./deploy.sh backup`
-- Monitor logs regularly
-- Update the application periodically
+```bash
+cd /home/alan/homelab/fcxc-stats
+docker compose up -d --build
+```
 
-### Data Structure
+### Configuration
 
-The application tracks:
-- **Athletes**: Name, gender, graduation year
-- **Venues**: Meet locations
-- **Meets**: Competition events
-- **Races**: Individual races within meets
-- **Results**: Individual athlete performances
+The webapp reads `DATABASE_URL` from its environment (set in `docker-compose.yml`).
+The SQLite database at `data/fcxc_stats.db` is bind-mounted into the container
+at `/data/fcxc_stats.db`.
+
+The `VIRTUAL_HOST` environment variable is used by the external reverse proxy
+to route traffic to this container.
+
+## Database
+
+The database is a single SQLite file at `data/fcxc_stats.db`. Tables are
+created automatically on startup by both the scraper and webapp if they
+don't already exist. The schema is defined in `database/init.sql` for reference.
+
+### Backup
+
+```bash
+./deploy.sh backup
+# or manually:
+cp data/fcxc_stats.db "backup_$(date +%Y%m%d_%H%M%S).db"
+```
+
+## Troubleshooting
+
+**Webapp not starting:**
+```bash
+cd /home/alan/homelab/fcxc-stats
+docker compose logs webapp
+```
+
+**Database empty after deploy:**
+Run the scraper to populate the database, then restart the webapp:
+```bash
+cd scraper && source .venv/bin/activate
+DATABASE_URL=sqlite:///$(pwd)/../data/fcxc_stats.db python scraper.py --config ../config/races.yaml
+```
+
+**Scraper import errors:**
+Ensure you activated the venv: `source scraper/.venv/bin/activate`

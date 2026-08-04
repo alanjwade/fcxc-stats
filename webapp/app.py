@@ -34,7 +34,83 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False, "timeout": 30})
+
+
+def init_db():
+    """Create database tables if they don't exist."""
+    statements = [
+        """CREATE TABLE IF NOT EXISTS page_views (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            page_path VARCHAR(500) NOT NULL,
+            user_agent TEXT,
+            ip_address TEXT,
+            referer TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            session_id VARCHAR(100)
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_page_views_timestamp ON page_views(timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_page_views_page_path ON page_views(page_path)",
+        """CREATE TABLE IF NOT EXISTS athletes (
+            id TEXT PRIMARY KEY,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            gender VARCHAR(10) NOT NULL CHECK (gender IN ('male', 'female')),
+            school VARCHAR(200),
+            graduation_year INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS venues (
+            id TEXT PRIMARY KEY,
+            name VARCHAR(200) NOT NULL,
+            location VARCHAR(200),
+            state VARCHAR(50),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS meets (
+            id TEXT PRIMARY KEY,
+            name VARCHAR(200) NOT NULL,
+            meet_date DATE NOT NULL,
+            venue_id TEXT REFERENCES venues(id),
+            season VARCHAR(10) NOT NULL,
+            milesplit_url TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS races (
+            id TEXT PRIMARY KEY,
+            meet_id TEXT REFERENCES meets(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            distance VARCHAR(20) NOT NULL,
+            race_class VARCHAR(20) NOT NULL,
+            gender VARCHAR(10) NOT NULL CHECK (gender IN ('male', 'female', 'mixed')),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS results (
+            id TEXT PRIMARY KEY,
+            race_id TEXT REFERENCES races(id) ON DELETE CASCADE,
+            athlete_id TEXT REFERENCES athletes(id) ON DELETE CASCADE,
+            time_seconds REAL NOT NULL,
+            place INTEGER,
+            varsity_points INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_athletes_name ON athletes(last_name, first_name)",
+        "CREATE INDEX IF NOT EXISTS idx_athletes_gender ON athletes(gender)",
+        "CREATE INDEX IF NOT EXISTS idx_meets_date ON meets(meet_date)",
+        "CREATE INDEX IF NOT EXISTS idx_meets_season ON meets(season)",
+        "CREATE INDEX IF NOT EXISTS idx_races_meet ON races(meet_id)",
+        "CREATE INDEX IF NOT EXISTS idx_races_class_gender ON races(race_class, gender)",
+        "CREATE INDEX IF NOT EXISTS idx_results_race ON results(race_id)",
+        "CREATE INDEX IF NOT EXISTS idx_results_athlete ON results(athlete_id)",
+        "CREATE INDEX IF NOT EXISTS idx_results_time ON results(time_seconds)",
+    ]
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+
+init_db()
 
 # Filter for Fort Collins High School only
 SCHOOL_FILTER = "Fort Collins High School"
@@ -684,32 +760,32 @@ def analytics_dashboard():
                     COUNT(DISTINCT session_id) as unique_visitors,
                     SUM(CASE WHEN page_path = 'team_stats' THEN 1 ELSE 0 END) as team_stats_views,
                     SUM(CASE WHEN page_path = 'athlete_page' THEN 1 ELSE 0 END) as athlete_page_views,
-                    COUNT(DISTINCT DATE(timestamp)) as active_days
+                    COUNT(DISTINCT date(timestamp)) as active_days
                 FROM page_views
-                WHERE timestamp >= NOW() - INTERVAL '30 days'
+                WHERE timestamp >= datetime('now', '-30 days')
             """)).fetchone()
             
             # Daily activity (last 30 days)
             daily_stats = conn.execute(text("""
                 SELECT 
-                    DATE(timestamp) as date,
+                    date(timestamp) as date,
                     SUM(CASE WHEN page_path = 'team_stats' THEN 1 ELSE 0 END) as team_stats_views,
                     SUM(CASE WHEN page_path = 'athlete_page' THEN 1 ELSE 0 END) as athlete_page_views,
                     COUNT(DISTINCT session_id) as unique_visitors
                 FROM page_views
-                WHERE timestamp >= NOW() - INTERVAL '30 days'
-                GROUP BY DATE(timestamp)
+                WHERE timestamp >= datetime('now', '-30 days')
+                GROUP BY date(timestamp)
                 ORDER BY date DESC
             """)).fetchall()
             
             # Hourly pattern (last 7 days)
             hourly_stats = conn.execute(text("""
                 SELECT 
-                    EXTRACT(HOUR FROM timestamp) as hour,
+                    CAST(strftime('%H', timestamp) AS INTEGER) as hour,
                     COUNT(*) as views
                 FROM page_views
-                WHERE timestamp >= NOW() - INTERVAL '7 days'
-                GROUP BY EXTRACT(HOUR FROM timestamp)
+                WHERE timestamp >= datetime('now', '-7 days')
+                GROUP BY strftime('%H', timestamp)
                 ORDER BY hour
             """)).fetchall()
             

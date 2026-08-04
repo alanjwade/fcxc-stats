@@ -1,100 +1,123 @@
 # Cross Country Statistics Tracker
 
-A containerized application for tracking cross country team statistics across multiple seasons with web scraping capabilities from MileSplit.com.
+An application for tracking Fort Collins High School cross country team statistics with web scraping capabilities from MileSplit.com.
 
 ## Features
 
 - **Data Collection**: Semi-automated scraping of race results from co.milesplit.com
-- **Database Storage**: PostgreSQL database for storing athlete and meet information
+- **Database Storage**: SQLite database for storing athlete and meet information
 - **CSV Export**: Generate comprehensive athlete performance reports
 - **Team Statistics**: View best times by gender and overall team performance
 - **Athlete Profiles**: Individual athlete statistics including PRs and varsity points
-- **Containerized Deployment**: Docker-based setup for easy home server deployment
 
 ## Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Data Scraper  │───▶│   PostgreSQL    │◀──▶│  Web Dashboard  │
-│   (Offline)     │    │   Database      │    │   (Flask App)   │
+│   Data Scraper  │───▶│     SQLite      │◀──▶│  Web Dashboard  │
+│  (Standalone)   │    │    Database     │    │ (Docker/Flask)  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │                       ▲
-                                │                       │
-                                └───────────────────────┤
-                                                        │
-                         ┌─────────────────────────────────┐
-                         │        Nginx Reverse Proxy      │
-                         │        (Port 80/443)            │
-                         └─────────────────────────────────┘
 ```
 
-## Quick Start
-
-1. Initialize the environment: `./deploy.sh init`
-2. Configure your race data in `config/races.yaml`
-3. Edit `.env` with your settings
-4. Start the application: `./deploy.sh start`
-5. Import race data: `./deploy.sh scrape`
-6. Access the dashboard at `http://localhost`
+The scraper runs standalone (not in Docker) and populates a SQLite database.
+The webapp runs in Docker and reads the same database. A reverse proxy is
+handled externally (e.g. via a homelab Docker orchestration layer).
 
 ## Project Structure
 
 ```
 fcxc_stats/
-├── scraper/          # Data scraping module
+├── scraper/              # Data scraping module (standalone)
+│   ├── .venv/            # Python virtual environment
+│   ├── requirements.txt
+│   ├── scraper.py        # Main scraping logic
+│   ├── download_page.py  # Playwright page downloader
+│   └── pages/            # Downloaded HTML pages
+├── webapp/               # Flask web application (Docker)
 │   ├── Dockerfile
 │   ├── requirements.txt
-│   └── scraper.py    # Main scraping logic
-├── webapp/           # Flask web application
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── app.py        # Main Flask application
-│   └── templates/    # HTML templates
-├── database/         # Database schema
-│   └── init.sql      # PostgreSQL schema
-├── nginx/            # Reverse proxy configuration
-│   ├── nginx.conf
-│   └── default.conf
-├── config/           # Configuration files
-│   └── races.yaml    # Race definitions
-├── docker-compose.yml
-├── deploy.sh         # Deployment script
-└── DEPLOYMENT.md     # Detailed deployment guide
+│   ├── app.py            # Main Flask application
+│   └── templates/        # HTML templates
+├── database/             # Database schema
+│   └── init.sql          # SQLite schema
+├── config/               # Configuration files
+│   └── races.yaml        # Race definitions
+├── data/                 # SQLite database (shared between scraper & webapp)
+├── docker-compose.yml    # Webapp Docker deployment
+└── deploy.sh             # Deployment script
 ```
 
-## ✅ **Scraper Usage**
+## Running the Scraper
 
-The MileSplit scraper now includes intelligent duplicate prevention and flexible operation modes:
+The scraper runs outside of Docker using a local virtual environment.
 
-### Basic Scraping (Prevents Duplicates)
+### Setup
+
 ```bash
-# Standard run - skips existing data, adds only new results
-docker-compose --profile scraper run --rm scraper
+cd scraper
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### Full Database Refresh
+### Usage
+
 ```bash
-# Clear database and reload all data
-docker-compose --profile scraper run --rm scraper python scraper.py --clear-db
+cd scraper
+source .venv/bin/activate
+
+# Standard run — skips existing data, adds only new results
+DATABASE_URL=sqlite:///$(pwd)/../data/fcxc_stats.db python scraper.py --config ../config/races.yaml
+
+# Full database refresh — clear and reload all data
+DATABASE_URL=sqlite:///$(pwd)/../data/fcxc_stats.db python scraper.py --clear-db --config ../config/races.yaml
 ```
 
-### Custom Configuration
+### Downloading Pages with Playwright
+
+Some MileSplit pages require JavaScript rendering. Use the standalone downloader:
+
 ```bash
-# Use custom configuration file
-docker-compose --profile scraper run --rm scraper python scraper.py --config /path/to/races.yaml
+cd scraper
+source .venv/bin/activate
+python download_page.py "https://co.milesplit.com/meets/..." "pages/output.html"
 ```
 
 ### Scraper Features
-✅ **Smart Duplicate Prevention**: Automatically skips existing results  
-✅ **Meet/Race Separation**: Clean organization with meet names and race names  
-✅ **Incremental Updates**: Add new races without affecting existing data  
-✅ **Flexible Configuration**: YAML-based race definitions  
-✅ **Robust Error Handling**: Continues processing even if individual races fail  
 
-**Everything works perfectly:**
-✅ Database schema with fractional seconds support  
-✅ Web dashboard with pace calculations  
-✅ CSV export functionality  
-✅ Team and athlete analytics  
-✅ Docker containerization  
-✅ Production-ready deployment
+- **Smart Duplicate Prevention**: Automatically skips existing results
+- **Incremental Updates**: Add new races without affecting existing data
+- **Flexible Configuration**: YAML-based race definitions in `config/races.yaml`
+- **Robust Error Handling**: Continues processing even if individual races fail
+
+## Deploying the Webapp
+
+The webapp runs as a Docker container, deployed to `/home/alan/homelab/fcxc-stats/`.
+
+### Deploy
+
+```bash
+./deploy.sh deploy   # Copy files to homelab directory
+./deploy.sh start    # Build and start the container
+```
+
+### Other Commands
+
+```bash
+./deploy.sh stop     # Stop the webapp container
+./deploy.sh restart  # Restart the webapp container
+./deploy.sh logs     # View webapp logs
+./deploy.sh backup   # Backup the SQLite database
+```
+
+The webapp container joins the `proxy-network` Docker network and is
+accessible via a reverse proxy configured elsewhere.
+
+### Manual Docker Usage
+
+```bash
+cd /home/alan/homelab/fcxc-stats
+docker compose up -d --build    # Start
+docker compose down             # Stop
+docker compose logs -f webapp   # Logs
+```

@@ -28,6 +28,9 @@ MANIFEST
 scraper/pages/
 *.html
 
+# SQLite database files
+data/*.db
+
 # Virtual environments
 venv/
 ENV/
@@ -61,12 +64,6 @@ Thumbs.db
 # Logs
 *.log
 logs/
-
-# SSL certificates (let's encrypt stores these elsewhere)
-certbot/conf/live/
-certbot/conf/archive/
-certbot/conf/renewal/
-certbot/logs/
 
 # Temporary files
 *.tmp

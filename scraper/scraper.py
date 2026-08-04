@@ -17,10 +17,9 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 import requests
 from bs4 import BeautifulSoup
-import psycopg2
-from psycopg2.extras import DictCursor
 from sqlalchemy import create_engine, text
 from dataclasses import dataclass
+import uuid
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -63,11 +62,82 @@ class Result:
 class MileSplitScraper:
     def __init__(self, database_url: str):
         self.database_url = database_url
-        self.engine = create_engine(database_url)
+        self.engine = create_engine(database_url, connect_args={"check_same_thread": False, "timeout": 30})
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
+        self.init_db()
+
+    def init_db(self):
+        """Create database tables if they don't exist."""
+        statements = [
+            """CREATE TABLE IF NOT EXISTS page_views (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_path VARCHAR(500) NOT NULL,
+                user_agent TEXT,
+                ip_address TEXT,
+                referer TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                session_id VARCHAR(100)
+            )""",
+            """CREATE TABLE IF NOT EXISTS athletes (
+                id TEXT PRIMARY KEY,
+                first_name VARCHAR(100) NOT NULL,
+                last_name VARCHAR(100) NOT NULL,
+                gender VARCHAR(10) NOT NULL CHECK (gender IN ('male', 'female')),
+                school VARCHAR(200),
+                graduation_year INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS venues (
+                id TEXT PRIMARY KEY,
+                name VARCHAR(200) NOT NULL,
+                location VARCHAR(200),
+                state VARCHAR(50),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS meets (
+                id TEXT PRIMARY KEY,
+                name VARCHAR(200) NOT NULL,
+                meet_date DATE NOT NULL,
+                venue_id TEXT REFERENCES venues(id),
+                season VARCHAR(10) NOT NULL,
+                milesplit_url TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS races (
+                id TEXT PRIMARY KEY,
+                meet_id TEXT REFERENCES meets(id) ON DELETE CASCADE,
+                name VARCHAR(100) NOT NULL,
+                distance VARCHAR(20) NOT NULL,
+                race_class VARCHAR(20) NOT NULL,
+                gender VARCHAR(10) NOT NULL CHECK (gender IN ('male', 'female', 'mixed')),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS results (
+                id TEXT PRIMARY KEY,
+                race_id TEXT REFERENCES races(id) ON DELETE CASCADE,
+                athlete_id TEXT REFERENCES athletes(id) ON DELETE CASCADE,
+                time_seconds REAL NOT NULL,
+                place INTEGER,
+                varsity_points INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_athletes_name ON athletes(last_name, first_name)",
+            "CREATE INDEX IF NOT EXISTS idx_athletes_gender ON athletes(gender)",
+            "CREATE INDEX IF NOT EXISTS idx_meets_date ON meets(meet_date)",
+            "CREATE INDEX IF NOT EXISTS idx_meets_season ON meets(season)",
+            "CREATE INDEX IF NOT EXISTS idx_races_meet ON races(meet_id)",
+            "CREATE INDEX IF NOT EXISTS idx_races_class_gender ON races(race_class, gender)",
+            "CREATE INDEX IF NOT EXISTS idx_results_race ON results(race_id)",
+            "CREATE INDEX IF NOT EXISTS idx_results_athlete ON results(athlete_id)",
+            "CREATE INDEX IF NOT EXISTS idx_results_time ON results(time_seconds)",
+        ]
+        with self.engine.begin() as conn:
+            for stmt in statements:
+                conn.execute(text(stmt))
 
     def clear_database(self):
         """Clear all existing race data from the database before scraping."""
@@ -2147,31 +2217,33 @@ class MileSplitScraper:
         # Default fallback
         return 'male'
 
-    def get_or_create_venue(self, venue_name: str) -> str:
+    def get_or_create_venue(self, venue_name: str, conn=None) -> str:
         """Get existing venue or create new one, return venue_id."""
-        with self.engine.connect() as conn:
-            # Check if venue exists
-            result = conn.execute(
+        def _execute(c):
+            result = c.execute(
                 text("SELECT id FROM venues WHERE name = :name"),
                 {"name": venue_name}
             ).fetchone()
-            
             if result:
                 return str(result[0])
-            
-            # Create new venue
-            result = conn.execute(
-                text("INSERT INTO venues (name) VALUES (:name) RETURNING id"),
-                {"name": venue_name}
+            venue_id = str(uuid.uuid4())
+            c.execute(
+                text("INSERT INTO venues (id, name) VALUES (:id, :name)"),
+                {"id": venue_id, "name": venue_name}
             )
-            conn.commit()
-            return str(result.fetchone()[0])
+            return venue_id
 
-    def get_or_create_athlete(self, athlete: Athlete) -> str:
+        if conn is not None:
+            return _execute(conn)
+        with self.engine.connect() as c:
+            result = _execute(c)
+            c.commit()
+            return result
+
+    def get_or_create_athlete(self, athlete: Athlete, conn=None) -> str:
         """Get existing athlete or create new one, return athlete_id."""
-        with self.engine.connect() as conn:
-            # Check if athlete exists
-            result = conn.execute(
+        def _execute(c):
+            result = c.execute(
                 text("""
                     SELECT id FROM athletes 
                     WHERE first_name = :first_name 
@@ -2186,18 +2258,16 @@ class MileSplitScraper:
                     "school": athlete.school
                 }
             ).fetchone()
-            
             if result:
                 return str(result[0])
-            
-            # Create new athlete
-            result = conn.execute(
+            athlete_id = str(uuid.uuid4())
+            c.execute(
                 text("""
-                    INSERT INTO athletes (first_name, last_name, gender, school, graduation_year) 
-                    VALUES (:first_name, :last_name, :gender, :school, :graduation_year) 
-                    RETURNING id
+                    INSERT INTO athletes (id, first_name, last_name, gender, school, graduation_year) 
+                    VALUES (:id, :first_name, :last_name, :gender, :school, :graduation_year) 
                 """),
                 {
+                    "id": athlete_id,
                     "first_name": athlete.first_name,
                     "last_name": athlete.last_name,
                     "gender": athlete.gender,
@@ -2205,9 +2275,14 @@ class MileSplitScraper:
                     "graduation_year": athlete.graduation_year
                 }
             )
-            conn.commit()
-            athlete_id = str(result.fetchone()[0])
             return athlete_id
+
+        if conn is not None:
+            return _execute(conn)
+        with self.engine.connect() as c:
+            result = _execute(c)
+            c.commit()
+            return result
 
     def store_race_results(self, race_config: RaceConfig, results: List[Result]):
         """Store race results in the database, avoiding duplicates."""
@@ -2218,7 +2293,7 @@ class MileSplitScraper:
         try:
             with self.engine.connect() as conn:
                 # Get or create venue
-                venue_id = self.get_or_create_venue(race_config.venue)
+                venue_id = self.get_or_create_venue(race_config.venue, conn)
                 
                 # Check if meet already exists, if not create it
                 meet_result = conn.execute(
@@ -2237,13 +2312,14 @@ class MileSplitScraper:
                     meet_id = str(meet_result[0])
                 else:
                     # Create new meet
-                    meet_result = conn.execute(
+                    meet_id = str(uuid.uuid4())
+                    conn.execute(
                         text("""
-                            INSERT INTO meets (name, meet_date, venue_id, season, milesplit_url)
-                            VALUES (:name, :meet_date, :venue_id, :season, :url)
-                            RETURNING id
+                            INSERT INTO meets (id, name, meet_date, venue_id, season, milesplit_url)
+                            VALUES (:id, :name, :meet_date, :venue_id, :season, :url)
                         """),
                         {
+                            "id": meet_id,
                             "name": race_config.meet_name,
                             "meet_date": race_config.date,
                             "venue_id": venue_id,
@@ -2251,7 +2327,6 @@ class MileSplitScraper:
                             "url": race_config.url
                         }
                     )
-                    meet_id = str(meet_result.fetchone()[0])
                 
                 # Check if race already exists
                 race_result = conn.execute(
@@ -2311,7 +2386,7 @@ class MileSplitScraper:
                         result_key = (first_name, last_name, school, time_seconds, place)
                         
                         if result_key not in existing_set:
-                            athlete_id = self.get_or_create_athlete(result.athlete)
+                            athlete_id = self.get_or_create_athlete(result.athlete, conn)
                             new_results.append({
                                 "race_id": race_id,
                                 "athlete_id": athlete_id,
@@ -2324,10 +2399,12 @@ class MileSplitScraper:
                     
                     # Bulk insert new results
                     if new_results:
+                        for r in new_results:
+                            r["id"] = str(uuid.uuid4())
                         conn.execute(
                             text("""
-                                INSERT INTO results (race_id, athlete_id, time_seconds, place, varsity_points)
-                                VALUES (:race_id, :athlete_id, :time_seconds, :place, :varsity_points)
+                                INSERT INTO results (id, race_id, athlete_id, time_seconds, place, varsity_points)
+                                VALUES (:id, :race_id, :athlete_id, :time_seconds, :place, :varsity_points)
                             """),
                             new_results
                         )
@@ -2343,13 +2420,14 @@ class MileSplitScraper:
                         
                 else:
                     # Create new race
-                    race_result = conn.execute(
+                    race_id = str(uuid.uuid4())
+                    conn.execute(
                         text("""
-                            INSERT INTO races (meet_id, name, distance, race_class, gender)
-                            VALUES (:meet_id, :name, :distance, :race_class, :gender)
-                            RETURNING id
+                            INSERT INTO races (id, meet_id, name, distance, race_class, gender)
+                            VALUES (:id, :meet_id, :name, :distance, :race_class, :gender)
                         """),
                         {
+                            "id": race_id,
                             "meet_id": meet_id,
                             "name": race_config.race_name,
                             "distance": race_config.distance,
@@ -2357,18 +2435,18 @@ class MileSplitScraper:
                             "gender": self.map_gender_for_db(race_config.gender)
                         }
                     )
-                    race_id = str(race_result.fetchone()[0])
                     
                     # Store all results for new race
                     for result in results:
-                        athlete_id = self.get_or_create_athlete(result.athlete)
+                        athlete_id = self.get_or_create_athlete(result.athlete, conn)
                         
                         conn.execute(
                             text("""
-                                INSERT INTO results (race_id, athlete_id, time_seconds, place, varsity_points)
-                                VALUES (:race_id, :athlete_id, :time_seconds, :place, :varsity_points)
+                                INSERT INTO results (id, race_id, athlete_id, time_seconds, place, varsity_points)
+                                VALUES (:id, :race_id, :athlete_id, :time_seconds, :place, :varsity_points)
                             """),
                             {
+                                "id": str(uuid.uuid4()),
                                 "race_id": race_id,
                                 "athlete_id": athlete_id,
                                 "time_seconds": result.time_seconds,

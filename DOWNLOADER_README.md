@@ -4,46 +4,39 @@ A standalone script using Playwright to download MileSplit pages for offline pro
 
 ## Files
 
-- `download_page.py` - Python script that uses Playwright to download web pages
-- `download_page.sh` - Bash helper script to build and run the downloader
+- `scraper/download_page.py` - Python script that uses Playwright to download web pages
 
 ## Setup
 
-The scraper Docker container includes Playwright and Chromium. No additional setup needed beyond building the container.
+Requires the scraper virtual environment with Playwright installed:
+
+```bash
+cd scraper
+source .venv/bin/activate
+pip install -r requirements.txt
+playwright install chromium
+```
 
 ## Usage
 
-### Using the helper script:
-
 ```bash
-./download_page.sh "URL" "output_file.html"
-```
-
-### Using docker compose directly:
-
-```bash
-docker compose run --rm -v "$(pwd)/scraper/pages:/app/pages" scraper \
-  python download_page.py "URL" "pages/output_file.html"
-```
-
-### From within the container:
-
-```bash
-python download_page.py "https://example.com/page" "pages/output.html"
+cd scraper
+source .venv/bin/activate
+python download_page.py "URL" "pages/output_file.html"
 ```
 
 ## Examples
 
 Download the Regionals 2025 page:
 ```bash
-./download_page.sh \
+python download_page.py \
   "https://co.milesplit.com/meets/694555-colorado-5a-region-4-cross-country-2025/results" \
   "pages/regionals_2025_5a_region_4.html"
 ```
 
 Download with auto-generated filename:
 ```bash
-./download_page.sh "https://co.milesplit.com/meets/694555-colorado-5a-region-4-cross-country-2025/results"
+python download_page.py "https://co.milesplit.com/meets/694555-colorado-5a-region-4-cross-country-2025/results"
 ```
 
 ## How It Works
@@ -60,10 +53,9 @@ Download with auto-generated filename:
 - 60-second timeout for slow pages
 - Automatic directory creation
 - Dynamic content rendering (JavaScript-heavy sites)
-- Volume mount to save files on host filesystem
 
 ## Requirements
 
-- Docker and docker compose
-- Playwright and Chromium (included in Docker image)
+- Python 3 with the scraper virtual environment
+- Playwright and Chromium (`playwright install chromium`)
 - See `scraper/requirements.txt` for Python dependencies

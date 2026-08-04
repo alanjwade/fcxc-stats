@@ -5,7 +5,6 @@ WORKDIR /app
 # Install system dependencies including those needed for Playwright
 RUN apt-get update && apt-get install -y \
     gcc \
-    postgresql-client \
     wget \
     fonts-liberation \
     libasound2 \
