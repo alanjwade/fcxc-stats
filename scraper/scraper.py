@@ -157,7 +157,7 @@ class MileSplitScraper:
             raise
 
     def load_race_config(self, config_path: str) -> List[RaceConfig]:
-        """Load race configuration from YAML file."""
+        """Load race configuration from old-format YAML file (config/races.yaml)."""
         try:
             with open(config_path, 'r') as file:
                 config = yaml.safe_load(file)
@@ -168,6 +168,55 @@ class MileSplitScraper:
         except Exception as e:
             logger.error(f"Error loading config file {config_path}: {e}")
             return []
+
+    def load_sources_config(self, sources_path: str) -> List[RaceConfig]:
+        """
+        Load race configuration from the new canonical sources format
+        (sources/meets.yaml). Each meet entry with a file source gets
+        expanded into per-race RaceConfig entries.
+        """
+        try:
+            with open(sources_path, 'r') as f:
+                config = yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Error loading sources config {sources_path}: {e}")
+            return []
+
+        sources_dir = os.path.dirname(os.path.abspath(sources_path))
+        race_configs = []
+
+        for meet_entry in config.get('meets', []):
+            source = meet_entry.get('source', {})
+            source_type = source.get('type', 'file')
+            source_path = source.get('path')
+            source_url = source.get('url')
+
+            for race in meet_entry.get('races', []):
+                rc = RaceConfig(
+                    meet_name=meet_entry['name'],
+                    race_name=race['name'],
+                    distance=race['distance'],
+                    race_class=race.get('class', 'varsity'),
+                    gender=race.get('gender', 'boys'),
+                    venue=meet_entry.get('venue', ''),
+                    date=meet_entry.get('date', ''),
+                    season=meet_entry.get('season', ''),
+                    url=source_url,
+                    file=None,
+                    algorithm='auto',  # Will trigger auto-detect
+                    results_title=race.get('section_title'),
+                    race_number=race.get('race_number'),
+                )
+
+                if source_type == 'file' and source_path:
+                    # Resolve relative to the sources directory
+                    rc.file = os.path.join(sources_dir, source_path)
+                elif source_type == 'url' and source_url:
+                    rc.url = source_url
+
+                race_configs.append(rc)
+
+        return race_configs
 
     def map_gender_for_db(self, config_gender: str) -> str:
         """Map configuration gender values to database gender values."""
@@ -915,7 +964,7 @@ class MileSplitScraper:
         return school_mappings.get(school_name, school_name)
 
     def scrape_race_results(self, source: str, is_file: bool = False, algorithm: str = 'default', gender: str = 'unknown', race_config: Optional[RaceConfig] = None) -> List[Result]:
-        """Scrape race results using the selected algorithm."""
+        """Scrape race results using the selected algorithm or auto-detection."""
         logger.info(f"Algorithm selected: '{algorithm}' for source: {source}")
         if race_config:
             logger.info(f"Race: {race_config.race_name}, results_title: {getattr(race_config, 'results_title', 'N/A')}")
@@ -937,6 +986,10 @@ class MileSplitScraper:
             return self.scrape_northern_conference_format(source, is_file, race_config=race_config)
         elif algorithm == 'regionals_table':
             return self.scrape_regionals_table_format(source, is_file, race_config=race_config)
+        elif algorithm == 'auto':
+            # Auto-detect parser from the new parsers module
+            return self._scrape_with_auto_parser(source, is_file, race_config)
+
         # Default algorithm
         try:
             if is_file:
@@ -994,6 +1047,94 @@ class MileSplitScraper:
         except Exception as e:
             logger.error(f"Error scraping {source}: {e}")
             return []
+
+    def _scrape_with_auto_parser(self, source: str, is_file: bool,
+                                 race_config: Optional[RaceConfig] = None) -> List[Result]:
+        """
+        Use the new modular parser system to auto-detect and parse results.
+        Falls back to the default algorithm if the parser module is unavailable.
+        """
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from parsers import find_parser
+        except ImportError:
+            logger.warning("Parser modules not available, falling back to default algorithm")
+            return self._fallback_default_scrape(source, is_file, race_config)
+
+        if is_file:
+            if not os.path.exists(source):
+                logger.error(f"File not found: {source}")
+                return []
+            with open(source, 'r', encoding='utf-8') as f:
+                content = f.read()
+        else:
+            try:
+                response = self.session.get(source, timeout=30)
+                response.raise_for_status()
+                content = response.text
+            except Exception as e:
+                logger.error(f"Error fetching {source}: {e}")
+                return []
+
+        parser = find_parser(content)
+        if parser is None:
+            logger.warning(f"No parser found for source {source}, falling back to default")
+            return self._fallback_default_scrape(source, is_file, race_config)
+
+        logger.info(f"Auto-detected parser: {parser.__class__.__name__}")
+
+        try:
+            sections = parser.extract_races(content)
+        except Exception as e:
+            logger.error(f"Parser {parser.__class__.__name__} failed: {e}")
+            return self._fallback_default_scrape(source, is_file, race_config)
+
+        if not sections:
+            logger.warning(f"Parser returned no sections from {source}")
+            return []
+
+        race_key = race_config.results_title if race_config and race_config.results_title else "default"
+        race_num = str(race_config.race_number) if race_config and race_config.race_number is not None else None
+
+        matched_results = None
+        if race_key in sections:
+            matched_results = sections[race_key]
+        elif race_num and race_num in sections:
+            matched_results = sections[race_num]
+        elif len(sections) == 1:
+            matched_results = list(sections.values())[0]
+        else:
+            for key, results in sections.items():
+                if race_key and race_key.lower() in key.lower():
+                    matched_results = results
+                    break
+
+        if matched_results is None:
+            logger.warning(f"No matching section found for '{race_key}' in {list(sections.keys())}")
+            return []
+
+        db_gender = self.map_gender_for_db(race_config.gender) if race_config else 'male'
+        results = []
+        for pr in matched_results:
+            athlete = Athlete(
+                first_name=pr.first_name,
+                last_name=pr.last_name,
+                gender=db_gender,
+                school=pr.school if pr.school else (race_config.venue.split(',')[0].strip() if race_config else ''),
+                graduation_year=pr.graduation_year,
+            )
+            results.append(Result(
+                athlete=athlete,
+                time_seconds=pr.time_seconds,
+                place=pr.place,
+            ))
+
+        logger.info(f"Parsed {len(results)} results using {parser.__class__.__name__}")
+        return results
+
+    def _fallback_default_scrape(self, source: str, is_file: bool,
+                                  race_config: Optional[RaceConfig] = None) -> List[Result]:
+        return self.scrape_race_results(source, is_file, algorithm='default', race_config=race_config)
 
     def scrape_desert_twilight_format(self, source: str, is_file: bool = False, race_config: Optional[RaceConfig] = None) -> List[Result]:
         """Scrape race results using the Desert Twilight format."""
@@ -2498,10 +2639,12 @@ class MileSplitScraper:
 def main():
     """Main function to run the scraper."""
     parser = argparse.ArgumentParser(description='Cross Country Statistics Scraper')
-    parser.add_argument('--clear-db', action='store_true', 
+    parser.add_argument('--clear-db', action='store_true',
                        help='Clear all existing data before scraping')
     parser.add_argument('--config', type=str, default='/app/config/races.yaml',
-                       help='Path to races configuration file')
+                       help='Path to old-format races configuration file (config/races.yaml)')
+    parser.add_argument('--sources', type=str,
+                       help='Path to new-format sources configuration file (sources/meets.yaml)')
     
     args = parser.parse_args()
     
@@ -2510,16 +2653,34 @@ def main():
         logger.error("DATABASE_URL environment variable not set")
         sys.exit(1)
     
-    config_path = args.config
-    if not os.path.exists(config_path):
-        # Fallback to environment variable if file not found
-        config_path = os.getenv('CONFIG_PATH', '/app/config/races.yaml')
-        if not os.path.exists(config_path):
-            logger.error(f"Config file not found: {config_path}")
-            sys.exit(1)
-    
     scraper = MileSplitScraper(database_url)
-    race_configs = scraper.load_race_config(config_path)
+    
+    # Determine which config to load
+    if args.sources:
+        # New canonical sources format
+        sources_path = args.sources
+        if not os.path.exists(sources_path):
+            # Try relative to project root or scraper directory
+            alt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), args.sources)
+            if os.path.exists(alt_path):
+                sources_path = alt_path
+            else:
+                logger.error(f"Sources file not found: {sources_path}")
+                sys.exit(1)
+        
+        logger.info(f"Loading sources config from: {sources_path}")
+        race_configs = scraper.load_sources_config(sources_path)
+    else:
+        # Old-format config
+        config_path = args.config
+        if not os.path.exists(config_path):
+            config_path = os.getenv('CONFIG_PATH', '/app/config/races.yaml')
+            if not os.path.exists(config_path):
+                logger.error(f"Config file not found: {config_path}")
+                sys.exit(1)
+        
+        logger.info(f"Loading old-format config from: {config_path}")
+        race_configs = scraper.load_race_config(config_path)
     
     if not race_configs:
         logger.error("No race configurations found")
@@ -2538,13 +2699,13 @@ def main():
         try:
             # Determine source and type
             if race_config.file:
-                # Use local file - look in the scraper directory
-                if race_config.file.startswith('pages/'):
-                    # File path is relative to scraper directory
+                # File path is already resolved in load_sources_config
+                # or needs resolution for old-format config
+                if not os.path.isabs(race_config.file) and race_config.file.startswith('pages/'):
+                    # Old-format: relative to scraper directory
                     file_path = os.path.join(os.path.dirname(__file__), race_config.file)
                 else:
-                    # File path is relative to config file
-                    file_path = os.path.join(os.path.dirname(config_path), race_config.file)
+                    file_path = race_config.file
                 results = scraper.scrape_race_results(file_path, is_file=True, algorithm=getattr(race_config, 'algorithm', 'default'), gender=getattr(race_config, 'gender', 'unknown'), race_config=race_config)
             elif race_config.url:
                 # Use URL

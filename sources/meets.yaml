@@ -1,0 +1,524 @@
+# =============================================================================
+# Cross Country Statistics Tracker — Canonical Race Metadata
+# =============================================================================
+#
+# This is the single source of truth for past race data. Each meet entry
+# defines the meet metadata and the races within it, pointing to the raw
+# source file downloaded via Playwright or copied from MileSplit.
+#
+# Adding a new meet:
+#   1. Download the page: scraper/download_page.py <URL> sources/pages/2026/<meet>/<file>
+#   2. Add an entry here with the meet info and race definitions.
+#   3. Run: python scraper/scraper.py --sources sources/meets.yaml
+#
+# If the page format is unfamiliar, the scraper's auto-detect will try all
+# registered parsers. If none match, you'll need to add a new parser in
+# scraper/parsers/.
+#
+# Fields:
+#   - name:        Display name for the meet/event
+#   - date:        Race date in YYYY-MM-DD format
+#   - venue:       Venue name
+#   - season:      Year of the season (e.g. "2025")
+#   - source:      Where the raw data lives
+#       type:      "file" or "url"
+#       path:      Path relative to sources/ (for type: file)
+#       url:       URL (for type: url)
+#   - races[]:     List of races within this meet
+#       name:      Display name (e.g. "Varsity Boys")
+#       distance:  Distance (e.g. "5K", "2M")
+#       class:     Category: "varsity", "jv", "freshman"
+#       gender:    "boys", "girls", or "mixed"
+#       section_title:  Title string used by parsers to find the section in a
+#                       combined results file (omitted if file is per-race)
+# =============================================================================
+
+meets:
+  # ===========================================================================
+  # Rocky Mountain Lobo Invitational 2025 — August 23, 2025
+  # Source: 4 separate HTML files, one per race
+  # Parser: default (auto-detected)
+  # ===========================================================================
+  - name: "Rocky Mountain Lobo Invitational 2025"
+    date: "2025-08-23"
+    venue: "Rocky Mountain High School, Fort Collins CO"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/rocky_mountain_lobo/varsity_boys.html"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+
+  - name: "Rocky Mountain Lobo Invitational 2025"
+    date: "2025-08-23"
+    venue: "Rocky Mountain High School, Fort Collins CO"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/rocky_mountain_lobo/varsity_girls.html"
+    races:
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+
+  - name: "Rocky Mountain Lobo Invitational 2025"
+    date: "2025-08-23"
+    venue: "Rocky Mountain High School, Fort Collins CO"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/rocky_mountain_lobo/jv_boys.html"
+    races:
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+
+  - name: "Rocky Mountain Lobo Invitational 2025"
+    date: "2025-08-23"
+    venue: "Rocky Mountain High School, Fort Collins CO"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/rocky_mountain_lobo/jv_girls.html"
+    races:
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+
+  # ===========================================================================
+  # Vista Nation XC 2-Mile Invitational 2025 — August 23, 2025
+  # Source: 4 separate HTML files, one per race (2-mile distance)
+  # Parser: default (auto-detected)
+  # ===========================================================================
+  - name: "Vista Nation XC 2-Mile Invitational 2025"
+    date: "2025-08-23"
+    venue: "Mountain Vista High School, Highlands Ranch CO"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/vista_nation/boys_varsity.html"
+    races:
+      - name: "Boys Varsity"
+        distance: "2M"
+        class: "varsity"
+        gender: "boys"
+
+  - name: "Vista Nation XC 2-Mile Invitational 2025"
+    date: "2025-08-23"
+    venue: "Mountain Vista High School, Highlands Ranch CO"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/vista_nation/girls_varsity.html"
+    races:
+      - name: "Girls Varsity"
+        distance: "2M"
+        class: "varsity"
+        gender: "girls"
+
+  - name: "Vista Nation XC 2-Mile Invitational 2025"
+    date: "2025-08-23"
+    venue: "Mountain Vista High School, Highlands Ranch CO"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/vista_nation/boys_frosh_soph.html"
+    races:
+      - name: "Boys Freshman/Sophomore"
+        distance: "2M"
+        class: "freshman"
+# ===========================================================================
+  # John Martin XC Invitational 2025 — August 30, 2025
+  # Source: 4 separate HTML files, one per race
+  # Parser: john_martin (4-column table: Place, Name, School, Time)
+  # ===========================================================================
+  - name: "John Martin XC Invitational 2025"
+    date: "2025-08-30"
+    venue: "Fort Collins High School"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/john_martin/boys_varsity.html"
+    races:
+      - name: "High School Boys Varsity"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+
+  - name: "John Martin XC Invitational 2025"
+    date: "2025-08-30"
+    venue: "Fort Collins High School"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/john_martin/boys_jv.html"
+    races:
+      - name: "High School Boys JV"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+
+  - name: "John Martin XC Invitational 2025"
+    date: "2025-08-30"
+    venue: "Fort Collins High School"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/john_martin/girls_varsity.html"
+    races:
+      - name: "High School Girls Varsity"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+
+  - name: "John Martin XC Invitational 2025"
+    date: "2025-08-30"
+    venue: "Fort Collins High School"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/john_martin/girls_jv.html"
+    races:
+      - name: "High School Girls JV"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+        gender: "boys"
+
+  - name: "Vista Nation XC 2-Mile Invitational 2025"
+    date: "2025-08-23"
+    venue: "Mountain Vista High School, Highlands Ranch CO"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/vista_nation/girls_frosh_soph.html"
+    races:
+      - name: "Girls Freshman/Sophomore"
+        distance: "2M"
+        class: "freshman"
+# ===========================================================================
+  # Thornton Cross Country Invitational 2025 — September 5, 2025
+  # Source: 1 combined HTML file containing 4 races in <pre> text
+  # Parser: thornton_combined
+  # ===========================================================================
+  - name: "Thornton Cross Country Invitational 2025"
+    date: "2025-09-05"
+    venue: "Thornton High School"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/thornton/combined_results.html"
+    races:
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2025 — September 13, 2025
+  # Source: 1 combined HTML file containing 6 races
+  # Parser: raw_combined (matches section_title to find races in raw text)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2025"
+    date: "2025-09-13"
+    venue: "Heritage High School XC Course"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/liberty_bell/combined_results.html"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+        section_title: "Mens 5,000 Meters Saucony Sweepstakes Varsity Results"
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+        section_title: "Womens 5,000 Meters Runners Roost Sweepstakes Varsity Results"
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+        section_title: "Mens 5,000 Meters Sweepstakes JV Results"
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+        section_title: "Womens 5,000 Meters Sweepstakes JV Results"
+      - name: "Open Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+        section_title: "Mens 5,000 Meters Sweepstakes Open Results"
+      - name: "Open Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+        section_title: "Womens 5,000 Meters Sweepstakes Open Results"
+# ===========================================================================
+  # Windsor Wizards Invitational 2025 — September 21, 2025
+  # Source: 1 combined HTML file containing 4 races
+  # Parser: raw_windsor_combined (pre-formatted text with specific header lines)
+  # ===========================================================================
+  - name: "Windsor Wizards Invitational 2025"
+    date: "2025-09-21"
+    venue: "Windsor High School"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/windsor_wizards/combined_results.html"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+        section_title: "Windsor HS Varsity Boys"
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+        section_title: "Windsor HS Varsity Girls"
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+        section_title: "Windsor HS JV Boys"
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+        section_title: "Windsor HS JV Girls"
+
+  # ===========================================================================
+  # Desert Twilight XC Invite 2025 — September 26, 2025
+  # Source: 2 separate TXT files (boys/girls)
+  # Parser: desert_twilight (custom text format)
+  # ===========================================================================
+  - name: "Desert Twilight XC Invite 2025"
+    date: "2025-09-26"
+    venue: "Toka Sticks Golf Course, AZ"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/desert_twilight/boys.txt"
+    races:
+      - name: "Boys Sweepstakes"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+
+  - name: "Desert Twilight XC Invite 2025"
+    date: "2025-09-26"
+    venue: "Toka Sticks Golf Course, AZ"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/desert_twilight/girls.txt"
+    races:
+      - name: "Girls Sweepstakes"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+# ===========================================================================
+  # Loveland Sweetheart 2025 — September 27, 2025
+  # Source: 1 combined TXT file containing 4 races
+  # Parser: loveland_sweetheart (pre-formatted text, grade & gap fields)
+  # ===========================================================================
+  - name: "Loveland Sweetheart 2025"
+    date: "2025-09-27"
+    venue: "Loveland High School"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/loveland_sweetheart/combined_results.txt"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+        section_title: "HS Varsity Boys 5K"
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+        section_title: "HS Varsity Girls 5K"
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+        section_title: "Boys HS Open 5K"
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+        section_title: "Girls HS Open 5K"
+
+  # ===========================================================================
+  # Longs Peak Invitational 2025 — October 3, 2025
+  # Source: 2 separate TXT files (boys/girls)
+  # Parser: longs_peak (custom text format)
+  # ===========================================================================
+  - name: "Longs Peak Invitational 2025"
+    date: "2025-10-03"
+    venue: "Estes Park HS XC Course"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/longs_peak/boys.txt"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+
+  - name: "Longs Peak Invitational 2025"
+    date: "2025-10-03"
+    venue: "Estes Park HS XC Course"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/longs_peak/girls.txt"
+    races:
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+# ===========================================================================
+  # Northern Conference Championships 2025 — October 10, 2025
+  # Source: 1 combined TXT file containing 4 races (identified by race_number)
+  # Parser: northern_conference (pre-formatted text, race_number selects section)
+  # ===========================================================================
+  - name: "Northern Conference Championships 2025"
+    date: "2025-10-10"
+    venue: "Spring Canyon Park"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/northern_conference/combined_results.txt"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+        race_number: 3
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+        race_number: 4
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+        race_number: 5
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+        race_number: 6
+
+  # ===========================================================================
+  # Hawk JV Championships 2025 — October 17, 2025
+  # Source: 1 combined TXT file containing 2 races
+  # Parser: loveland_sweetheart (reused — same format as Loveland)
+  # ===========================================================================
+  - name: "Hawk JV Championships 2025"
+    date: "2025-10-17"
+    venue: "Adams County Regional Park XC Course"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/hawk_jv_champs/combined_results.txt"
+    races:
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+        section_title: "Boys 5000 Meters"
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+        section_title: "Girls 5000 Meters"
+# ===========================================================================
+  # Colorado 5A Region 4 Cross Country 2025 — October 23, 2025
+  # Source: 1 HTML file containing 2 races (boys/girls in tables)
+  # Parser: regionals_table (HTML table parsing)
+  # ===========================================================================
+  - name: "Colorado 5A Region 4 Cross Country 2025"
+    date: "2025-10-23"
+    venue: "Monfort Park"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/region_4/results.html"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+
+  # ===========================================================================
+  # Colorado 5A State Cross Country Championships 2025 — November 1, 2025
+  # Source: 3 files (combined_results.html, boys.html, girls.html)
+  # Parser: regionals_table (HTML table parsing)
+  # ===========================================================================
+  - name: "Colorado 5A State Cross Country Championships 2025"
+    date: "2025-11-01"
+    venue: "Norris Penrose Event Center"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/state_championships/boys.html"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+
+  - name: "Colorado 5A State Cross Country Championships 2025"
+    date: "2025-11-01"
+    venue: "Norris Penrose Event Center"
+    season: "2025"
+    source:
+      type: file
+      path: "pages/2025/state_championships/girls.html"
+    races:
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+
+# =============================================================================
+# Team information
+# =============================================================================
+team:
+  name: "Fort Collins High School"
+  abbreviation: "FCHS"
+  colors:
+    primary: "#FF0000"
+    secondary: "#FFFFFF"

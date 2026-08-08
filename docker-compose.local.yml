@@ -1,0 +1,20 @@
+# Local containerized testing — builds the image locally and binds port 5000
+# directly (no external proxy network required).
+#
+# Usage:
+#   docker compose -f docker-compose.local.yml up --build
+#   docker compose -f docker-compose.local.yml down
+
+services:
+  webapp:
+    build:
+      context: .
+      dockerfile: webapp/Dockerfile
+    container_name: fcxc_webapp_local
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/data
+    environment:
+      - DATABASE_URL=sqlite:////data/fcxc_stats.db
+      - SECRET_KEY=local-dev-secret-not-for-production

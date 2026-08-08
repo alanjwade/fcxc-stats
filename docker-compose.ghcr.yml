@@ -1,0 +1,28 @@
+# Production deployment using a pre-built image from GitHub Container Registry.
+# The image is built and pushed automatically by GitHub Actions on push to main.
+#
+# Usage on the server:
+#   docker compose -f docker-compose.ghcr.yml pull
+#   docker compose -f docker-compose.ghcr.yml up -d
+#
+# To update to the latest image:
+#   docker compose -f docker-compose.ghcr.yml pull && docker compose -f docker-compose.ghcr.yml up -d
+
+services:
+  webapp:
+    image: ghcr.io/alanjwade/fcxc-stats:latest
+    container_name: fcxc_webapp
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    environment:
+      - DATABASE_URL=sqlite:////data/fcxc_stats.db
+      - VIRTUAL_HOST=xc.fchsrunning.org
+    networks:
+      - proxy-network
+    expose:
+      - "5000"
+
+networks:
+  proxy-network:
+    external: true
