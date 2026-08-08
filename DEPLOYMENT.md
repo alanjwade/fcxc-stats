@@ -3,21 +3,8 @@
 ## Overview
 
 - **Scraper**: Runs standalone on your dev machine using a Python virtual environment
-- **Webapp**: Runs as a Docker container (two deployment strategies — see below)
+- **Webapp**: Docker container deployed to homelab01 via homelab-infra
 - **Reverse Proxy / TLS**: Handled externally by the homelab Docker orchestration
-
-## Webapp Deployment Strategies
-
-Two strategies exist. The old one is still in place; the GHCR strategy is the
-recommended path going forward.
-
-| | Old (rsync + build on server) | New (GHCR image) |
-|---|---|---|
-| Requires source on server | Yes | No |
-| Build happens | On the server | In GitHub Actions |
-| Update flow | rsync → docker build | push to main → Actions → pull |
-| Script | `deploy_homelab00.sh` | `deploy_homelab00_ghcr.sh` |
-| Compose file | `docker-compose.yml` | `docker-compose.ghcr.yml` |
 
 ## Scraper Setup
 
@@ -86,134 +73,119 @@ Use `Ctrl-C` / `docker compose -f docker-compose.local.yml down` to stop.
 
 ---
 
-## GHCR Deployment (new, recommended)
+## Production Deployment (homelab01)
 
-This strategy builds the Docker image in GitHub Actions and publishes it to
-GitHub Container Registry. The server only needs Docker — no source code, no
-build step on the server.
+The image is built by GitHub Actions on push to `main` and published to GHCR.
+The `homelab-deployment/` folder contains the three files that belong in
+`~/homelab-infra/hosts/homelab01/fcxc-stats/`.
 
-### Step 1 — Set up GitHub (one-time)
+### Step 1 — Build and push the Docker image
 
-1. **Push this repo to GitHub** if not already done (it's `alanjwade/fcxc-stats`).
-2. The workflow file at `.github/workflows/build-push.yml` is already committed.
-   It will trigger automatically on the next push to `main` that touches
-   `webapp/` or `config/`.
-3. **Make the package public** (optional but simplifies server setup):
-   - After the first successful workflow run, go to your GitHub profile →
-     **Packages** → `fcxc-stats` → **Package settings** → change visibility to
-     **Public**.
-   - If you leave it private, the server must authenticate before pulling
-     (see Step 2b below).
-4. No additional GitHub secrets are needed — the workflow uses the built-in
-   `GITHUB_TOKEN`.
-
-### Step 2 — Set up the server (one-time)
-
-SSH into the server and:
+**Option A: Push a Git tag (recommended for production releases)**
 
 ```bash
-# Create the data directory
-mkdir -p ~/homelab00-config/websites/volumes/sites/fcxc_web/data
+git tag v1.0.0
+git push origin v1.0.0
+```
 
-# If the GHCR package is PRIVATE, log Docker in to GHCR:
-# (create a PAT at https://github.com/settings/tokens with 'read:packages' scope)
+GitHub Actions will build and push the image as `ghcr.io/alanjwade/fcxc-stats:v1.0.0`.
+
+**Option B: Push to main (automatic, uses SHA tags)**
+
+```bash
+git commit -m "Your changes"
+git push origin main
+```
+
+GitHub Actions will build and push with tags:
+- `latest` (for the latest main commit)
+- `sha-abc123d` (for the specific commit)
+
+**Then update `homelab-deployment/docker-compose.yml`:**
+
+```yaml
+image: ghcr.io/alanjwade/fcxc-stats:v1.0.0  # use the tag from Step 1
+```
+
+Check [Packages](https://github.com/alanjwade/fcxc-stats/pkgs/container/fcxc-stats) to see available tags.
+
+### Step 2 — Copy files to homelab-infra (one-time)
+
+```bash
+scp -r homelab-deployment/ homelab@homelab01:~/homelab-infra/hosts/homelab01/fcxc-stats
+```
+
+For subsequent updates, re-copy only the compose file after updating the tag:
+
+```bash
+scp homelab-deployment/docker-compose.yml homelab@homelab01:~/homelab-infra/hosts/homelab01/fcxc-stats/
+```
+
+### Step 3 — First-time server setup (one-time)
+
+On homelab01:
+
+```bash
+mkdir -p /opt/homelab/fcxc-stats/data
+
+cd ~/homelab-infra/hosts/homelab01/fcxc-stats
+cp .env.example .env
+
+# If the GHCR package is private, authenticate with a PAT (read:packages scope):
 echo YOUR_PAT | docker login ghcr.io -u alanjwade --password-stdin
-
-# If the GHCR package is PUBLIC, no login is needed.
 ```
 
-Also confirm the `proxy-network` Docker network exists on the server (it's
-created by whatever runs your reverse proxy — nginx-proxy, Traefik, etc.).
-
-### Step 3 — Deploy from your dev machine
+### Step 4 — Deploy
 
 ```bash
-./deploy_homelab00_ghcr.sh
+cd ~/homelab-infra/hosts/homelab01/fcxc-stats
+docker compose up -d
+docker compose logs -f
 ```
 
-This copies `docker-compose.ghcr.yml` and the database to the server, then
-pulls the latest image and restarts the container in one step.
+### Step 5 — Seed the database (first time only)
 
-### Updating after a code change
-
-1. Commit and push to `main` — GitHub Actions builds and pushes `latest`
-   automatically.
-2. Run `./deploy_homelab00_ghcr.sh` to pull and restart on the server.
-   (Or SSH in and run `docker compose -f docker-compose.ghcr.yml pull && docker
-   compose -f docker-compose.ghcr.yml up -d` manually.)
-
-### Image reference
-
-```
-ghcr.io/alanjwade/fcxc-stats:latest     # always the most recent main build
-ghcr.io/alanjwade/fcxc-stats:sha-XXXXX  # pinned to a specific commit
-```
-
----
-
-## Old Deployment (rsync + build on server)
-
-### Deploy to homelab00
+Run the scraper locally, then copy the database to the server:
 
 ```bash
-./deploy_homelab00.sh
-# Then on the server:
-ssh homelab@homelab00 'cd /home/homelab/homelab00-config/websites/volumes/sites/fcxc_web && docker compose up -d --build'
+scp data/fcxc_stats.db homelab@homelab01:/opt/homelab/fcxc-stats/data/
 ```
 
-### Deploy to local homelab path (deploy.sh)
+### Updating
 
-```bash
-./deploy.sh deploy    # Copies webapp/, config/, and docker-compose.yml to homelab
-./deploy.sh start     # Builds and starts the container
-```
+To push a new version to production:
 
-### Other deploy.sh commands
-
-```bash
-./deploy.sh stop      # Stop the webapp
-./deploy.sh restart   # Restart the webapp
-./deploy.sh logs      # Tail webapp logs
-./deploy.sh backup    # Copy the SQLite database to a timestamped backup file
-```
-
-### Configuration
-
-The webapp reads `DATABASE_URL` from its environment (set in the compose file).
-The SQLite database at `data/fcxc_stats.db` is bind-mounted into the container
-at `/data/fcxc_stats.db`.
-
-The `VIRTUAL_HOST` environment variable is used by the external reverse proxy
-to route traffic to this container.
-
-## Database
-
-The database is a single SQLite file at `data/fcxc_stats.db`. Tables are
-created automatically on startup by both the scraper and webapp if they
-don't already exist. The schema is defined in `database/init.sql` for reference.
+1. Commit your changes and push to `main` (or work in a branch)
+2. Tag the release:
+   ```bash
+   git tag v1.0.1
+   git push origin v1.0.1
+   ```
+3. Wait for [Actions](https://github.com/alanjwade/fcxc-stats/actions) to build
+4. Update `homelab-deployment/docker-compose.yml` with the new tag (e.g., `v1.0.1`)
+5. Deploy:
+   ```bash
+   scp homelab-deployment/docker-compose.yml homelab@homelab01:~/homelab-infra/hosts/homelab01/fcxc-stats/
+   ssh homelab@homelab01 'cd ~/homelab-infra/hosts/homelab01/fcxc-stats && docker compose pull && docker compose up -d'
+   ```
 
 ### Backup
 
-```bash
-./deploy.sh backup
-# or manually:
-cp data/fcxc_stats.db "backup_$(date +%Y%m%d_%H%M%S).db"
-```
+The database at `/opt/homelab/fcxc-stats/data` is backed up per
+`homelab-deployment/backup.yml`. No manual steps needed if homelab-infra's
+backup system is configured.
+
+---
 
 ## Troubleshooting
 
 **Webapp not starting:**
 ```bash
-cd /home/alan/homelab/fcxc-stats
-docker compose logs webapp
+ssh homelab@homelab01 'cd ~/homelab-infra/hosts/homelab01/fcxc-stats && docker compose logs fcxc-stats'
 ```
 
 **Database empty after deploy:**
-Run the scraper to populate the database, then restart the webapp:
-```bash
-cd scraper && source .venv/bin/activate
-DATABASE_URL=sqlite:///$(pwd)/../data/fcxc_stats.db python scraper.py --config ../config/races.yaml
-```
+Run the scraper locally, then copy the database to the server (see Step 5 above).
 
 **Scraper import errors:**
-Ensure you activated the venv: `source scraper/.venv/bin/activate`
+Ensure the venv is active: `source scraper/.venv/bin/activate`

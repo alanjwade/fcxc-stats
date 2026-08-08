@@ -1,0 +1,19 @@
+services:
+  fcxc-stats:
+    container_name: fcxc-stats
+    image: ghcr.io/alanjwade/fcxc-stats:v1.0.0  # update to the desired version tag from GitHub Actions
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=sqlite:////data/fcxc_stats.db
+      - VIRTUAL_HOST=${VIRTUAL_HOST}
+      - TZ=${TZ}
+    volumes:
+      - /opt/homelab/fcxc-stats/data:/data
+    networks:
+      - proxy-network
+    expose:
+      - "5000"
+
+networks:
+  proxy-network:
+    external: true
