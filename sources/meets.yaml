@@ -326,6 +326,7 @@ meets:
         distance: "5K"
         class: "varsity"
         gender: "boys"
+        section_title: "Mens 5,000 Meters Sweepstakes"
 
   - name: "Desert Twilight XC Invite 2025"
     date: "2025-09-26"
@@ -339,6 +340,7 @@ meets:
         distance: "5K"
         class: "varsity"
         gender: "girls"
+        section_title: "Womens 5,000 Meters Sweepstakes"
 # ===========================================================================
   # Loveland Sweetheart 2025 — September 27, 2025
   # Source: 1 combined TXT file containing 4 races

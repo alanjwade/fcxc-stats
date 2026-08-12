@@ -17,7 +17,10 @@ class ThorntonCombinedParser(BaseParser):
     parser_name = "thornton_combined"
 
     def can_parse(self, content: str) -> bool:
-        return "Thornton" in content and "Cross Country" in content
+        # Distinctive meet name — "Thornton Cross Country" appears in the
+        # Thornton Invitational pages but not in other combined result pages
+        # (e.g., Liberty Bell) that also contain "Cross Country".
+        return "Thornton Cross Country" in content
 
     def extract_races(self, content: str) -> Dict[str, List[ParsedResult]]:
         """Extract all races from the combined Thornton page."""

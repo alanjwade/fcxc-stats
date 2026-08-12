@@ -16,8 +16,15 @@ class LovelandSweetheartParser(BaseParser):
     parser_name = "loveland_sweetheart"
 
     def can_parse(self, content: str) -> bool:
-        # Check for the specific Loveland/Hawk format: place, lastname, firstname, grade, bib, school, score, time, gap
-        return bool(re.search(r'^\s*\d+\s+[A-Z\s\-\']+,\s+[A-Za-z\s\-\']+?\s+(SR|JR|SO|FR)', content, re.MULTILINE))
+        # Loveland Sweetheart / Hawk JV format rows look like:
+        #   " 1 BARRIOS, Noah Niwot High School 1 15:56.12 5:07.4 3:11.2"
+        # The last name is ALL CAPS followed by a comma, then a first name.
+        # (Hawk JV rows have no grade/year column, so we don't require one.)
+        return bool(re.search(
+            r'^\s*\d+\s+[A-Z][A-Z\s\'\-\_\.]+\s*,\s+[A-Za-z]',
+            content,
+            re.MULTILINE,
+        ))
 
     def extract_races(self, content: str) -> Dict[str, List[ParsedResult]]:
         sections = {}

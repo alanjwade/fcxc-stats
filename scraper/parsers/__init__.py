@@ -8,16 +8,19 @@ __init_subclass__ hook in BaseParser.
 
 from .base import BaseParser, ParsedResult, ParserRegistry
 
-# Import all parsers so they register themselves
+# Import all parsers so they register themselves.
+# Order matters: more-specific parsers must be imported (and therefore tried)
+# before generic ones. DefaultParser is intentionally last since it is the
+# broadest fallback.
 from . import john_martin
-from . import raw_combined
-from . import raw_windsor_combined
 from . import thornton_combined
+from . import raw_windsor_combined
 from . import desert_twilight
-from . import loveland_sweetheart
-from . import longs_peak
 from . import northern_conference
 from . import regionals_table
+from . import longs_peak
+from . import loveland_sweetheart
+from . import raw_combined
 from . import default_parser
 
 

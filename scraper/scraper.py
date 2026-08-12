@@ -25,6 +25,22 @@ import uuid
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Map the auto-detected modular parser class name to the proven scraping
+# algorithm implemented in this class. These proven methods are known to
+# reproduce the production database exactly for the existing data formats.
+PARSER_TO_ALGORITHM = {
+    'DefaultParser': 'default',
+    'JohnMartinParser': 'john_martin',
+    'ThorntonCombinedParser': 'thornton_combined',
+    'RawCombinedParser': 'raw_combined',
+    'RawWindsorCombinedParser': 'raw_windsor_combined',
+    'DesertTwilightParser': 'desert_twilight',
+    'LovelandSweetheartParser': 'loveland_sweetheart',
+    'LongsPeakParser': 'longs_peak',
+    'NorthernConferenceParser': 'northern_conference',
+    'RegionalsTableParser': 'regionals_table',
+}
+
 @dataclass
 class RaceConfig:
     meet_name: str
@@ -1051,8 +1067,13 @@ class MileSplitScraper:
     def _scrape_with_auto_parser(self, source: str, is_file: bool,
                                  race_config: Optional[RaceConfig] = None) -> List[Result]:
         """
-        Use the new modular parser system to auto-detect and parse results.
-        Falls back to the default algorithm if the parser module is unavailable.
+        Auto-detect the race format and parse the results.
+
+        The detected modular parser identifies the format; the actual
+        extraction is dispatched to the proven scraping method implemented in
+        this class (scrape_*_format) which is known to produce results that
+        match the production database. For unknown/new formats (not mapped
+        below), the modular parser's own extract_races() is used instead.
         """
         try:
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -1081,12 +1102,24 @@ class MileSplitScraper:
             logger.warning(f"No parser found for source {source}, falling back to default")
             return self._fallback_default_scrape(source, is_file, race_config)
 
-        logger.info(f"Auto-detected parser: {parser.__class__.__name__}")
+        parser_name = parser.__class__.__name__
+        logger.info(f"Auto-detected parser: {parser_name}")
 
+        # Dispatch to the proven scraping method for known formats.
+        algorithm = PARSER_TO_ALGORITHM.get(parser_name)
+        if algorithm:
+            logger.info(f"Dispatching {parser_name} to proven algorithm: '{algorithm}'")
+            return self.scrape_race_results(
+                source, is_file=is_file, algorithm=algorithm,
+                gender=(race_config.gender if race_config else 'unknown'),
+                race_config=race_config,
+            )
+
+        # Unknown/new format: use the modular parser's own extraction.
         try:
             sections = parser.extract_races(content)
         except Exception as e:
-            logger.error(f"Parser {parser.__class__.__name__} failed: {e}")
+            logger.error(f"Parser {parser_name} failed: {e}")
             return self._fallback_default_scrape(source, is_file, race_config)
 
         if not sections:
@@ -1129,7 +1162,7 @@ class MileSplitScraper:
                 place=pr.place,
             ))
 
-        logger.info(f"Parsed {len(results)} results using {parser.__class__.__name__}")
+        logger.info(f"Parsed {len(results)} results using {parser_name}")
         return results
 
     def _fallback_default_scrape(self, source: str, is_file: bool,

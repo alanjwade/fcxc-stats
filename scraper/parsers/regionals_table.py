@@ -17,8 +17,12 @@ class RegionalsTableParser(BaseParser):
     parser_name = "regionals_table"
 
     def can_parse(self, content: str) -> bool:
-        return ("Region 4" in content or "State Championships" in content or
-                "5A Region" in content) and "<table" in content
+        # MileSplit table-based results pages (Region 4, State Championships,
+        # etc.) use results <table> elements with a distinctive id prefix like
+        # m5000mfinalsFinals / "5000 Meter Run Finals".
+        return ("<table" in content
+                and ("m5000mfinals" in content
+                     or "5000 Meter Run Finals" in content))
 
     def extract_races(self, content: str) -> Dict[str, List[ParsedResult]]:
         soup = BeautifulSoup(content, 'html.parser')
