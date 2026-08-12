@@ -15,6 +15,7 @@ import os
 import io
 import csv
 import uuid
+import random
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Union
 import decimal
@@ -35,6 +36,25 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required")
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False, "timeout": 30})
+
+TAGLINES = [
+    "Who wears short shorts? We wear short shorts.",
+    "Our sport is your sport's punishment.",
+    "5K? We do that before breakfast.",
+    "Your sport's warmup is our workout.",
+    "Pain is temporary. PRs are forever.",
+    "Mud is just a free exfoliant.",
+    "Hills don't scare us. Hills motivate us. Hills are lying.",
+    "Some heroes wear capes. We wear race bibs.",
+    "We run cross country because the country isn't going to cross itself.",
+    "Other sports get courts and turf. We get hills, mud, and glory.",
+    "Not all who wander are lost. Some are doing fartlek intervals.",
+    "Our sport requires no equipment. Just suffering.",
+    "Three miles of beautiful, voluntary suffering.",
+    "The trail doesn't care about your excuses.",
+    "We're the ones who actually enjoy the 'fun run' at school.",
+    "Cross country: the original trail blazing.",
+]
 
 
 def init_db():
@@ -301,9 +321,10 @@ def index():
             
             recent_meets = conn.execute(recent_meets_query, {"school": SCHOOL_FILTER}).fetchall()
             
-            return render_template('index.html', 
-                                 stats=stats, 
-                                 recent_meets=recent_meets)
+            return render_template('index.html',
+                                 stats=stats,
+                                 recent_meets=recent_meets,
+                                 tagline=random.choice(TAGLINES))
     
     except Exception as e:
         logger.error(f"Error loading dashboard: {e}")
