@@ -124,14 +124,38 @@ git commit -m "Bump fcxc-stats version to v${NEW_VERSION} for homelab01 deployme
 echo -e "${GREEN}✓ Changes committed${NC}"
 echo ""
 
-# Push to remote
-echo -e "${YELLOW}Pushing to remote repository...${NC}"
+# Push commit to remote
+echo -e "${YELLOW}Pushing commit to remote repository...${NC}"
 if git push origin HEAD; then
-    echo -e "${GREEN}✓ Changes pushed to remote${NC}"
+    echo -e "${GREEN}✓ Commit pushed to remote${NC}"
 else
-    echo -e "${RED}Warning: Failed to push. You may need to push manually.${NC}"
+    echo -e "${RED}Error: Failed to push commit. Aborting tag creation.${NC}"
+    exit 1
 fi
 
 echo ""
-echo -e "${GREEN}Version bump complete!${NC}"
-echo "Next step: Run './deploy_homelab01.sh' to deploy the new version."
+
+# Create and push git tag (triggers GitHub Actions build)
+echo -e "${YELLOW}Creating git tag v${NEW_VERSION}...${NC}"
+if git tag -a "v${NEW_VERSION}" -m "Release version v${NEW_VERSION}"; then
+    echo -e "${GREEN}✓ Tag created locally${NC}"
+else
+    echo -e "${RED}Error: Failed to create git tag.${NC}"
+    exit 1
+fi
+
+echo -e "${YELLOW}Pushing tag to remote (triggers GitHub Actions build)...${NC}"
+if git push origin "v${NEW_VERSION}"; then
+    echo -e "${GREEN}✓ Tag pushed to remote${NC}"
+else
+    echo -e "${RED}Error: Failed to push tag. You may need to push manually:${NC}"
+    echo "  git push origin v${NEW_VERSION}"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}Version bump and tag creation complete!${NC}"
+echo "GitHub Actions will now build and push: ${BLUE}ghcr.io/alanjwade/fcxc-stats:v${NEW_VERSION}${NC}"
+echo ""
+echo "Next step: Wait ~5-15 minutes for the build to complete, then run:"
+echo "  ./deploy_homelab01.sh"

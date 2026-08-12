@@ -35,7 +35,7 @@ The deployment is split into two scripts to separate concerns:
 
 ## Deployment Workflow
 
-### Step 1: Bump Version (Local)
+### Step 1: Bump Version & Create Tag (Local)
 
 ```bash
 ./bump_version_homelab01.sh
@@ -49,7 +49,8 @@ The deployment is split into two scripts to separate concerns:
   - Optionally: `./bump_version_homelab01.sh major` (v1.0.0 → v2.0.0)
 - Updates `homelab-deployment/docker-compose.yml` with new tag
 - Commits: `Bump fcxc-stats version to v1.0.1 for homelab01 deployment`
-- Pushes to origin/main
+- Pushes commit to origin/main
+- **Creates git tag** `v1.0.1` and pushes it to origin (⚡ **triggers GitHub Actions build**)
 
 **Output:**
 ```
@@ -58,8 +59,18 @@ Current version: v1.0.0
 New version will be: v1.0.1
 ✓ File updated
 ✓ Changes committed
-✓ Changes pushed to remote
+✓ Commit pushed to remote
+✓ Tag created locally
+✓ Tag pushed to remote
+
+GitHub Actions will now build and push: ghcr.io/alanjwade/fcxc-stats:v1.0.1
 ```
+
+**Why tags?** The GitHub Actions workflow is configured to build Docker images when:
+1. A git tag matching `v*` is pushed, OR
+2. Files in `webapp/**` or `config/**` change
+
+Using tags ensures we build exactly when intended, and the tag name becomes the image tag (e.g., `v1.0.1`).
 
 **Next:** Wait for GitHub Actions to build and push the image to GHCR (~5-15 minutes)
 
@@ -103,16 +114,22 @@ abc123def456   ghcr.io/alanjwade/fcxc-stats:v1.0.1    "python app.py"    2 secon
 ## Typical Complete Workflow
 
 ```bash
-# 1. Bump version locally
+# 1. Bump version locally and create git tag
 ./bump_version_homelab01.sh
-# Output: Version bumped from v1.0.0 to v1.0.1, committed and pushed
+# Output: Version bumped from v1.0.0 to v1.0.1
+#         Commit pushed to main
+#         Git tag v1.0.1 pushed (⚡ triggers GitHub Actions)
 
 # 2. Wait for GitHub Actions (~5-15 min)
 # Watch: https://github.com/alanjwade/fcxc-stats/actions
+# Wait for the workflow to complete and image to be available at:
+#   ghcr.io/alanjwade/fcxc-stats:v1.0.1
 
 # 3. Deploy to homelab01
 ./deploy_homelab01.sh
-# Output: Image verified, repo updated, container restarted with v1.0.1
+# Output: Image verified in GHCR
+#         Repo updated on homelab01
+#         Container restarted with v1.0.1
 ```
 
 ## Troubleshooting
@@ -129,8 +146,14 @@ git commit -m "..."          # Commit
 ### "Error: Image not found in GHCR"
 The GitHub Actions workflow hasn't finished building the image yet. Check:
 - GitHub Actions status: https://github.com/alanjwade/fcxc-stats/actions
-- Verify the commit with the tag bump was pushed: `git log --oneline | head`
+- Verify the git tag was pushed: `git tag -l | tail`
+- Check the workflow logs to see if there's an error
 - Wait for the workflow to complete and try again: `./deploy_homelab01.sh`
+
+If the tag exists but the workflow didn't trigger, try pushing manually:
+```bash
+git push origin v1.0.1  # Re-push the tag (replace v1.0.1 with your version)
+```
 
 ### "Error: Cannot connect to homelab01 via SSH"
 SSH is not working or the connection timed out:
@@ -171,6 +194,8 @@ ssh homelab@homelab01 "cd /home/homelab/fcxc-stats/homelab-deployment && docker 
 ## Notes
 
 - The version tag in `homelab-deployment/docker-compose.yml` is the single source of truth for deployments
+- **Git tags trigger GitHub Actions:** When `bump_version_homelab01.sh` creates and pushes a git tag (e.g., `v1.0.1`), it triggers the Docker build workflow
+- The GitHub Actions workflow builds the image with tag matching the git tag name (e.g., `ghcr.io/alanjwade/fcxc-stats:v1.0.1`)
 - Both scripts check prerequisites before making changes
 - `bump_version_homelab01.sh` exits with status 1 on any error
 - `deploy_homelab01.sh` requires GitHub Actions to have completed the build before deployment
