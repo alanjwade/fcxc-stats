@@ -23,15 +23,18 @@ The deployment is split into two scripts to separate concerns:
 ### Local Setup
 - Working git repository with no uncommitted changes
 - SSH key configured for passwordless SSH to homelab01
-- Docker installed (for image verification)
+- Docker installed (optional, for image verification)
 - curl available (fallback for image verification)
 
 ### On homelab01 (`homelab` user)
-- fcxc-stats repo cloned at `/home/homelab/fcxc-stats`
-- Git configured to pull from GitHub (main branch)
-- `.env` file at `/home/homelab/fcxc-stats/homelab-deployment/.env` with required variables
+- homelab-infra repo cloned at `/home/homelab/homelab-infra`
+- `/opt/homelab/fcxc-stats/data/` directory exists with database
+- `.env` file at `/home/homelab/homelab-infra/hosts/homelab01/fcxc-stats/.env` with required variables
 - Docker and Docker Compose installed
-- SSH server listening and key-based auth working
+- proxy-network Docker network created
+- SSH key-based auth working
+
+**Note:** homelab01 uses the homelab-infra layout (not a direct fcxc-stats clone). Service configs are in `homelab-infra/hosts/homelab01/fcxc-stats/`, data in `/opt/homelab/fcxc-stats/data/`.
 
 ## Deployment Workflow
 
@@ -89,26 +92,31 @@ Check that the GitHub Actions workflow has completed:
 
 **Behavior:**
 - Extracts version tag from local `homelab-deployment/docker-compose.yml`
-- Verifies image exists in GHCR (fails if not found)
 - Connects to homelab01 via SSH
-- Verifies fcxc-stats repo exists at `/home/homelab/fcxc-stats`
-- Runs: `git fetch origin && git reset --hard origin/main` (pulls latest changes)
-- Verifies docker-compose.yml exists locally after git pull
-- Runs: `docker compose pull && docker compose up -d` in `homelab-deployment/` directory
+- Verifies homelab-infra repo exists at `/home/homelab/homelab-infra`
+- Ensures required directories exist: `/home/homelab/homelab-infra/hosts/homelab01/fcxc-stats/` and `/opt/homelab/fcxc-stats/data/`
+- Copies updated `docker-compose.yml` to homelab-infra service directory
+- Copies database (if it exists locally) to `/opt/homelab/fcxc-stats/data/`
+- Verifies `.env` file exists on remote
+- Runs: `docker compose pull && docker compose up -d` to pull new image and restart container
 - Shows container status
 
 **Output:**
 ```
 Image to deploy: ghcr.io/alanjwade/fcxc-stats:v1.0.1
-✓ Image found in GHCR (via docker manifest)
 ✓ SSH connection established
-✓ Remote repository found
-✓ Git repository updated
-✓ docker-compose.yml found
+✓ homelab-infra repository found
+✓ Directories created/verified
+✓ docker-compose.yml copied
+✓ Database copied
+✓ .env file found
 ✓ Container restarted successfully
 
 CONTAINER ID   IMAGE                                    COMMAND             CREATED         STATUS         PORTS        NAMES
 abc123def456   ghcr.io/alanjwade/fcxc-stats:v1.0.1    "python app.py"    2 seconds ago   Up 1 second    5000/tcp     fcxc-stats
+
+Deployment complete!
+The fcxc-stats container is now running with image ghcr.io/alanjwade/fcxc-stats:v1.0.1
 ```
 
 ## Typical Complete Workflow
@@ -155,6 +163,15 @@ If the tag exists but the workflow didn't trigger, try pushing manually:
 git push origin v1.0.1  # Re-push the tag (replace v1.0.1 with your version)
 ```
 
+### "Error: homelab-infra Git repository not found"
+The homelab-infra repo isn't cloned on homelab01. First-time setup:
+```bash
+ssh homelab@homelab01 "git clone https://github.com/alanjwade/homelab-infra.git /home/homelab/homelab-infra"
+mkdir -p /opt/homelab/fcxc-stats/data
+# Then copy .env.example to .env and fill in values
+scp homelab-deployment/.env.example homelab@homelab01:/home/homelab/homelab-infra/hosts/homelab01/fcxc-stats/.env
+```
+
 ### "Error: Cannot connect to homelab01 via SSH"
 SSH is not working or the connection timed out:
 ```bash
@@ -179,16 +196,22 @@ ssh homelab@homelab01 "cd /home/homelab/fcxc-stats/homelab-deployment && docker 
 To rollback to a previous version:
 
 ```bash
-# On homelab01
-ssh homelab@homelab01 "cd /home/homelab/fcxc-stats && git log --oneline | head -20"
-# Find the commit with the old version tag
+# View available versions in homelab-deployment/docker-compose.yml
+git log --oneline homelab-deployment/docker-compose.yml | head -10
 
-# Option 1: Reset to previous commit
-ssh homelab@homelab01 "cd /home/homelab/fcxc-stats && git reset --hard <commit-hash>"
-ssh homelab@homelab01 "cd /home/homelab/fcxc-stats/homelab-deployment && docker compose pull && docker compose up -d"
+# Find the commit with the desired version
+git show <commit-hash>:homelab-deployment/docker-compose.yml | grep image:
 
-# Option 2: Manually update docker-compose.yml
-# Edit homelab-deployment/docker-compose.yml to use the old image tag, commit, push, then run ./deploy_homelab01.sh
+# Either:
+# Option 1: Manually edit homelab-deployment/docker-compose.yml, commit, and redeploy
+git checkout <commit-hash> -- homelab-deployment/docker-compose.yml
+git commit -m "Rollback to version v1.0.0"
+git push origin main
+./deploy_homelab01.sh
+
+# Option 2: On homelab01, directly restart with old image
+ssh homelab@homelab01 "cd /home/homelab/homelab-infra/hosts/homelab01/fcxc-stats && \
+  docker compose pull && docker compose up -d"
 ```
 
 ## Notes
@@ -196,7 +219,8 @@ ssh homelab@homelab01 "cd /home/homelab/fcxc-stats/homelab-deployment && docker 
 - The version tag in `homelab-deployment/docker-compose.yml` is the single source of truth for deployments
 - **Git tags trigger GitHub Actions:** When `bump_version_homelab01.sh` creates and pushes a git tag (e.g., `v1.0.1`), it triggers the Docker build workflow
 - The GitHub Actions workflow builds the image with tag matching the git tag name (e.g., `ghcr.io/alanjwade/fcxc-stats:v1.0.1`)
+- homelab01 uses **homelab-infra layout**: service configs in homelab-infra repo, persistent data in `/opt/homelab/`
 - Both scripts check prerequisites before making changes
 - `bump_version_homelab01.sh` exits with status 1 on any error
-- `deploy_homelab01.sh` requires GitHub Actions to have completed the build before deployment
+- `deploy_homelab01.sh` copies files over SCP (no git pull) for simplicity
 - Use SSH key-based auth; password prompts will block deployment
