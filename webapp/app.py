@@ -132,8 +132,31 @@ def init_db():
 
 init_db()
 
+
+@app.context_processor
+def inject_season_context():
+    """Make season data available in every template."""
+    try:
+        with get_db_connection() as conn:
+            rows = conn.execute(text(
+                "SELECT DISTINCT season FROM meets ORDER BY season DESC"
+            )).fetchall()
+            available_seasons = [row.season for row in rows]
+    except Exception:
+        available_seasons = []
+    selected_season = request.args.get('season', CURRENT_SEASON)
+    return {
+        'current_season': CURRENT_SEASON,
+        'available_seasons': available_seasons,
+        'selected_season': selected_season,
+    }
+
+
 # Filter for Fort Collins High School only
 SCHOOL_FILTER = "Fort Collins High School"
+
+# The active season; data for prior seasons is accessible via the "Past Seasons" dropdown
+CURRENT_SEASON = '2026'
 
 # Analytics configuration - simplified
 EXCLUDED_IPS = {
@@ -288,9 +311,9 @@ app.jinja_env.globals.update(
 @app.route('/')
 def index():
     """Main dashboard page."""
+    season = request.args.get('season', CURRENT_SEASON)
     try:
         with get_db_connection() as conn:
-            # Get basic statistics for Fort Collins High School only
             stats_query = text("""
                 SELECT 
                     COUNT(DISTINCT a.id) as total_athletes,
@@ -298,15 +321,15 @@ def index():
                     COUNT(DISTINCT r.id) as total_races,
                     COUNT(res.id) as total_results
                 FROM athletes a
-                LEFT JOIN results res ON a.id = res.athlete_id
-                LEFT JOIN races r ON res.race_id = r.id
-                LEFT JOIN meets m ON r.meet_id = m.id
+                JOIN results res ON a.id = res.athlete_id
+                JOIN races r ON res.race_id = r.id
+                JOIN meets m ON r.meet_id = m.id
                 WHERE a.school = :school
+                AND (:season = 'all' OR m.season = :season)
             """)
             
-            stats = conn.execute(stats_query, {"school": SCHOOL_FILTER}).fetchone()
+            stats = conn.execute(stats_query, {"school": SCHOOL_FILTER, "season": season}).fetchone()
             
-            # Get recent meets (where Fort Collins athletes participated)
             recent_meets_query = text("""
                 SELECT DISTINCT m.name, m.meet_date, v.name as venue_name
                 FROM meets m
@@ -315,11 +338,12 @@ def index():
                 JOIN results res ON res.race_id = r.id
                 JOIN athletes a ON a.id = res.athlete_id
                 WHERE a.school = :school
+                AND (:season = 'all' OR m.season = :season)
                 ORDER BY m.meet_date DESC
                 LIMIT 5
             """)
             
-            recent_meets = conn.execute(recent_meets_query, {"school": SCHOOL_FILTER}).fetchall()
+            recent_meets = conn.execute(recent_meets_query, {"school": SCHOOL_FILTER, "season": season}).fetchall()
             
             return render_template('index.html',
                                  stats=stats,
@@ -333,6 +357,7 @@ def index():
 @app.route('/export/csv')
 def export_csv():
     """Export athlete data as CSV with one column per meet."""
+    season = request.args.get('season', CURRENT_SEASON)
     try:
         with get_db_connection() as conn:
             # Get all meets (where Fort Collins athletes participated)
@@ -346,12 +371,13 @@ def export_csv():
                 JOIN results res ON res.race_id = r.id
                 JOIN athletes a ON a.id = res.athlete_id
                 WHERE a.school = :school
+                AND (:season = 'all' OR m.season = :season)
                 ORDER BY m.meet_date, m.name
             """)
             
-            meets = conn.execute(meets_query, {"school": SCHOOL_FILTER}).fetchall()
+            meets = conn.execute(meets_query, {"school": SCHOOL_FILTER, "season": season}).fetchall()
             
-            # Get all Fort Collins High School athletes
+            # Get athletes who competed in the selected season
             athletes_query = text("""
                 SELECT DISTINCT 
                     a.id,
@@ -359,11 +385,15 @@ def export_csv():
                     a.last_name,
                     a.gender
                 FROM athletes a
+                JOIN results res ON a.id = res.athlete_id
+                JOIN races r ON res.race_id = r.id
+                JOIN meets m ON r.meet_id = m.id
                 WHERE a.school = :school
+                AND (:season = 'all' OR m.season = :season)
                 ORDER BY a.last_name, a.first_name
             """)
             
-            athletes = conn.execute(athletes_query, {"school": SCHOOL_FILTER}).fetchall()
+            athletes = conn.execute(athletes_query, {"school": SCHOOL_FILTER, "season": season}).fetchall()
             
             # Prepare CSV data
             output = io.StringIO()
@@ -428,13 +458,11 @@ def export_csv():
 @app.route('/team/stats')
 def team_stats():
     """Team statistics page with best times by gender."""
-    # Track this page view
     track_analytics('team_stats')
+    season = request.args.get('season', CURRENT_SEASON)
     
     try:
         with get_db_connection() as conn:
-            # Get best times by gender and distance for Fort Collins High School
-            # Group by name instead of athlete ID to handle duplicate athlete records
             boys_stats_query = text("""
                 WITH best_times AS (
                     SELECT 
@@ -445,7 +473,9 @@ def team_stats():
                     FROM athletes a
                     JOIN results res ON a.id = res.athlete_id
                     JOIN races r ON res.race_id = r.id
+                    JOIN meets m ON r.meet_id = m.id
                     WHERE a.gender = 'male' AND a.school = :school
+                    AND (:season = 'all' OR m.season = :season)
                     GROUP BY a.first_name, a.last_name, r.distance
                 ),
                 best_times_with_details AS (
@@ -464,6 +494,7 @@ def team_stats():
                     JOIN athletes a ON res.athlete_id = a.id AND a.first_name = bt.first_name AND a.last_name = bt.last_name
                     JOIN races r ON res.race_id = r.id AND r.distance = bt.distance
                     JOIN meets m ON r.meet_id = m.id
+                    WHERE (:season = 'all' OR m.season = :season)
                 )
                 SELECT 
                     first_name,
@@ -489,7 +520,9 @@ def team_stats():
                     FROM athletes a
                     JOIN results res ON a.id = res.athlete_id
                     JOIN races r ON res.race_id = r.id
+                    JOIN meets m ON r.meet_id = m.id
                     WHERE a.gender = 'female' AND a.school = :school
+                    AND (:season = 'all' OR m.season = :season)
                     GROUP BY a.first_name, a.last_name, r.distance
                 ),
                 best_times_with_details AS (
@@ -508,6 +541,7 @@ def team_stats():
                     JOIN athletes a ON res.athlete_id = a.id AND a.first_name = bt.first_name AND a.last_name = bt.last_name
                     JOIN races r ON res.race_id = r.id AND r.distance = bt.distance
                     JOIN meets m ON r.meet_id = m.id
+                    WHERE (:season = 'all' OR m.season = :season)
                 )
                 SELECT 
                     first_name,
@@ -523,8 +557,8 @@ def team_stats():
                 ORDER BY distance, best_time ASC
             """)
             
-            boys_stats = conn.execute(boys_stats_query, {"school": SCHOOL_FILTER}).fetchall()
-            girls_stats = conn.execute(girls_stats_query, {"school": SCHOOL_FILTER}).fetchall()
+            boys_stats = conn.execute(boys_stats_query, {"school": SCHOOL_FILTER, "season": season}).fetchall()
+            girls_stats = conn.execute(girls_stats_query, {"school": SCHOOL_FILTER, "season": season}).fetchall()
             
             # Process data by distance
             boys_by_distance = {}
@@ -574,6 +608,7 @@ def athlete_stats(athlete_id):
     """Individual athlete statistics page."""
     # Track this page view
     track_analytics('athlete_page')
+    season = request.args.get('season', CURRENT_SEASON)
     
     try:
         with get_db_connection() as conn:
@@ -645,6 +680,7 @@ def athlete_stats(athlete_id):
                                  results=results,
                                  prs=prs,
                                  pr_times=pr_times,
+                                 season=season,
                                  varsity_races=varsity_races,
                                  format_time=format_time)
     
@@ -655,6 +691,7 @@ def athlete_stats(athlete_id):
 @app.route('/athletes')
 def athletes_list():
     """List all Fort Collins High School athletes."""
+    season = request.args.get('season', CURRENT_SEASON)
     try:
         with get_db_connection() as conn:
             athletes_query = text("""
@@ -667,14 +704,16 @@ def athletes_list():
                     COUNT(res.id) as race_count,
                     MIN(CASE WHEN r.distance = '5K' THEN res.time_seconds END) as best_time
                 FROM athletes a
-                LEFT JOIN results res ON a.id = res.athlete_id
-                LEFT JOIN races r ON res.race_id = r.id
+                JOIN results res ON a.id = res.athlete_id
+                JOIN races r ON res.race_id = r.id
+                JOIN meets m ON r.meet_id = m.id
                 WHERE a.school = :school
+                AND (:season = 'all' OR m.season = :season)
                 GROUP BY a.id, a.first_name, a.last_name, a.gender, a.graduation_year
                 ORDER BY a.last_name, a.first_name
             """)
             
-            athletes = conn.execute(athletes_query, {"school": SCHOOL_FILTER}).fetchall()
+            athletes = conn.execute(athletes_query, {"school": SCHOOL_FILTER, "season": season}).fetchall()
             
             return render_template('athletes_list.html',
                                  athletes=athletes,
@@ -684,9 +723,112 @@ def athletes_list():
         logger.error(f"Error loading athletes list: {e}")
         return render_template('error.html', error=str(e)), 500
 
+
+@app.route('/api/athlete/search')
+def athlete_search_api():
+    """Search athletes by name and return top matches."""
+    query = request.args.get('q', '').strip()
+    season = request.args.get('season', CURRENT_SEASON)
+    if len(query) < 2:
+        return jsonify([])
+
+    try:
+        with get_db_connection() as conn:
+            search_query = text("""
+                SELECT
+                    a.id,
+                    a.first_name,
+                    a.last_name,
+                    a.gender,
+                    MAX(m.meet_date) as last_meet_date
+                FROM athletes a
+                LEFT JOIN results res ON a.id = res.athlete_id
+                LEFT JOIN races r ON res.race_id = r.id
+                LEFT JOIN meets m ON r.meet_id = m.id
+                WHERE a.school = :school
+                AND LOWER(a.first_name || ' ' || a.last_name) LIKE :pattern
+                GROUP BY a.id, a.first_name, a.last_name, a.gender
+                ORDER BY
+                    CASE
+                        WHEN LOWER(a.first_name || ' ' || a.last_name) = :exact THEN 0
+                        WHEN LOWER(a.last_name) = :exact OR LOWER(a.first_name) = :exact THEN 1
+                        ELSE 2
+                    END,
+                    a.last_name,
+                    a.first_name
+                LIMIT 8
+            """)
+
+            pattern = f"%{query.lower()}%"
+            rows = conn.execute(search_query, {
+                'school': SCHOOL_FILTER,
+                'pattern': pattern,
+                'exact': query.lower(),
+            }).fetchall()
+
+            matches = []
+            for row in rows:
+                matches.append({
+                    'athlete_id': row.id,
+                    'name': f"{row.first_name} {row.last_name}",
+                    'gender': row.gender,
+                    'last_meet_date': str(row.last_meet_date) if row.last_meet_date else None,
+                    'url': url_for('athlete_stats', athlete_id=row.id, season=season),
+                })
+
+            return jsonify(matches)
+
+    except Exception as e:
+        logger.error(f"Error searching athletes: {e}")
+        return jsonify([])
+
+
+@app.route('/athlete/search')
+def athlete_search_redirect():
+    """Redirect search to the best athlete match."""
+    query = request.args.get('q', '').strip()
+    season = request.args.get('season', CURRENT_SEASON)
+
+    if not query:
+        return redirect(url_for('athletes_list', season=season))
+
+    try:
+        with get_db_connection() as conn:
+            best_match_query = text("""
+                SELECT
+                    a.id
+                FROM athletes a
+                WHERE a.school = :school
+                AND LOWER(a.first_name || ' ' || a.last_name) LIKE :pattern
+                ORDER BY
+                    CASE
+                        WHEN LOWER(a.first_name || ' ' || a.last_name) = :exact THEN 0
+                        WHEN LOWER(a.last_name) = :exact OR LOWER(a.first_name) = :exact THEN 1
+                        ELSE 2
+                    END,
+                    a.last_name,
+                    a.first_name
+                LIMIT 1
+            """)
+
+            result = conn.execute(best_match_query, {
+                'school': SCHOOL_FILTER,
+                'pattern': f"%{query.lower()}%",
+                'exact': query.lower(),
+            }).fetchone()
+
+            if result:
+                return redirect(url_for('athlete_stats', athlete_id=result.id, season=season))
+            return redirect(url_for('athletes_list', season=season))
+
+    except Exception as e:
+        logger.error(f"Error redirecting athlete search: {e}")
+        return redirect(url_for('athletes_list', season=season))
+
 @app.route('/api/athlete/<athlete_id>/progress/<distance>')
 def athlete_progress_api(athlete_id, distance):
     """API endpoint for athlete progress data."""
+    scope = request.args.get('scope', 'all')
     try:
         with get_db_connection() as conn:
             if distance == 'all':
@@ -701,11 +843,14 @@ def athlete_progress_api(athlete_id, distance):
                     JOIN races r ON res.race_id = r.id
                     JOIN meets m ON r.meet_id = m.id
                     WHERE res.athlete_id = :athlete_id
+                    AND (:scope = 'all' OR m.season = :current_season)
                     ORDER BY m.meet_date ASC
                 """)
                 
                 progress = conn.execute(progress_query, {
-                    'athlete_id': athlete_id
+                    'athlete_id': athlete_id,
+                    'scope': scope,
+                    'current_season': CURRENT_SEASON,
                 }).fetchall()
                 
                 data = []
@@ -744,12 +889,15 @@ def athlete_progress_api(athlete_id, distance):
                     JOIN meets m ON r.meet_id = m.id
                     WHERE res.athlete_id = :athlete_id
                     AND r.distance = :distance
+                    AND (:scope = 'all' OR m.season = :current_season)
                     ORDER BY m.meet_date ASC
                 """)
                 
                 progress = conn.execute(progress_query, {
                     'athlete_id': athlete_id,
-                    'distance': distance
+                    'distance': distance,
+                    'scope': scope,
+                    'current_season': CURRENT_SEASON,
                 }).fetchall()
                 
                 data = [{

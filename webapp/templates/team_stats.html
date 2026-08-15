@@ -6,7 +6,12 @@
 <div class="row mb-4">
     <div class="col">
         <h1><i class="fas fa-users text-primary"></i> Team Statistics</h1>
-        <p class="lead">Best times by gender and distance</p>
+        <p class="lead">
+            Best times by gender and distance &mdash;
+            {% if selected_season == current_season %}{{ current_season }} Season (current)
+            {% elif selected_season == 'all' %}All Records
+            {% else %}{{ selected_season }} Season{% endif %}
+        </p>
     </div>
 </div>
 
@@ -185,7 +190,12 @@
             {% endfor %}
         {% else %}
             <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> No boys' results found.
+                <i class="fas fa-info-circle"></i>
+                {% if selected_season == current_season %}
+                    No boys' results yet for the {{ current_season }} season. Check back once meets are underway!
+                {% else %}
+                    No boys' results found for this season.
+                {% endif %}
             </div>
         {% endif %}
     </div>
@@ -366,7 +376,12 @@
             {% endfor %}
         {% else %}
             <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> No girls' results found.
+                <i class="fas fa-info-circle"></i>
+                {% if selected_season == current_season %}
+                    No girls' results yet for the {{ current_season }} season. Check back once meets are underway!
+                {% else %}
+                    No girls' results found for this season.
+                {% endif %}
             </div>
         {% endif %}
     </div>

@@ -149,26 +149,82 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
+                <form class="d-flex position-relative me-3" action="{{ url_for('athlete_search_redirect') }}" method="get" autocomplete="off">
+                    <input type="hidden" name="season" value="{{ selected_season }}">
+                    <input id="athleteSearchInput"
+                           name="q"
+                           class="form-control form-control-sm"
+                           type="search"
+                           placeholder="Search athlete"
+                           aria-label="Search athlete"
+                           style="min-width: 220px;">
+                    <button class="btn btn-sm btn-fchs-secondary ms-2" type="submit">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <div id="athleteSearchResults" class="dropdown-menu show w-100" style="display: none; top: 100%; left: 0;"></div>
+                </form>
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">
+                        <a class="nav-link" href="{{ url_for('index', season=selected_season) }}">
                             <i class="fas fa-home"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('team_stats') }}">
+                        <a class="nav-link" href="{{ url_for('team_stats', season=selected_season) }}">
                             <i class="fas fa-users"></i> Team Stats
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('athletes_list') }}">
+                        <a class="nav-link" href="{{ url_for('athletes_list', season=selected_season) }}">
                             <i class="fas fa-user-friends"></i> Athletes
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('export_csv') }}">
+                        <a class="nav-link" href="{{ url_for('export_csv', season=selected_season) }}">
                             <i class="fas fa-download"></i> Export CSV
                         </a>
+                    </li>
+                    <!-- Season selector -->
+                    <li class="nav-item dropdown ms-2">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-1 border border-fchs-gold rounded px-2"
+                           href="#" id="seasonDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"
+                           style="border-color: var(--fchs-gold) !important;">
+                            <i class="fas fa-calendar-alt text-fchs-gold"></i>
+                            <span class="text-fchs-gold fw-bold">
+                                {% if selected_season == current_season %}{{ current_season }} Season
+                                {% elif selected_season == 'all' %}All Records
+                                {% else %}{{ selected_season }} Season{% endif %}
+                            </span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="seasonDropdown">
+                            <li><h6 class="dropdown-header"><i class="fas fa-star"></i> Current Season</h6></li>
+                            <li>
+                                <a class="dropdown-item {% if selected_season == current_season %}active{% endif %}"
+                                   href="{{ request.path }}?season={{ current_season }}">
+                                    {{ current_season }} Season
+                                </a>
+                            </li>
+                            {% set past_seasons = available_seasons | reject('equalto', current_season) | list %}
+                            {% if past_seasons %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header"><i class="fas fa-history"></i> Past Seasons</h6></li>
+                            {% for s in past_seasons %}
+                            <li>
+                                <a class="dropdown-item {% if selected_season == s %}active{% endif %}"
+                                   href="{{ request.path }}?season={{ s }}">
+                                    {{ s }} Season
+                                </a>
+                            </li>
+                            {% endfor %}
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item {% if selected_season == 'all' %}active{% endif %}"
+                                   href="{{ request.path }}?season=all">
+                                    <i class="fas fa-infinity"></i> All Records
+                                </a>
+                            </li>
+                        </ul>
                     </li>
                 </ul>
             </div>
@@ -210,6 +266,68 @@
             };
             // Trigger load check
             logoImg.src = logoImg.src;
+
+            const searchInput = document.getElementById('athleteSearchInput');
+            const resultsMenu = document.getElementById('athleteSearchResults');
+            const seasonValue = '{{ selected_season }}';
+            let searchTimer = null;
+
+            function clearResults() {
+                resultsMenu.innerHTML = '';
+                resultsMenu.style.display = 'none';
+            }
+
+            function renderResults(items) {
+                if (!items || items.length === 0) {
+                    clearResults();
+                    return;
+                }
+
+                resultsMenu.innerHTML = items.map(item => {
+                    const genderIcon = item.gender === 'male' ? 'fa-male text-primary' : 'fa-female text-danger';
+                    return `
+                        <a class="dropdown-item d-flex justify-content-between align-items-center" href="${item.url}">
+                            <span><i class="fas ${genderIcon} me-2"></i>${item.name}</span>
+                            ${item.last_meet_date ? `<small class="text-muted">${item.last_meet_date}</small>` : ''}
+                        </a>
+                    `;
+                }).join('');
+                resultsMenu.style.display = 'block';
+            }
+
+            async function searchAthletes(query) {
+                try {
+                    const response = await fetch(`/api/athlete/search?q=${encodeURIComponent(query)}&season=${encodeURIComponent(seasonValue)}`);
+                    if (!response.ok) {
+                        clearResults();
+                        return;
+                    }
+                    const items = await response.json();
+                    renderResults(items);
+                } catch (err) {
+                    clearResults();
+                }
+            }
+
+            searchInput.addEventListener('input', function() {
+                const query = searchInput.value.trim();
+                if (query.length < 2) {
+                    clearResults();
+                    return;
+                }
+
+                if (searchTimer) {
+                    clearTimeout(searchTimer);
+                }
+
+                searchTimer = setTimeout(() => searchAthletes(query), 180);
+            });
+
+            document.addEventListener('click', function(event) {
+                if (!resultsMenu.contains(event.target) && event.target !== searchInput) {
+                    clearResults();
+                }
+            });
         });
     </script>
     {% block scripts %}{% endblock %}

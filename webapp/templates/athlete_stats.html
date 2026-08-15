@@ -21,7 +21,7 @@
         </p>
     </div>
     <div class="col-auto">
-        <a href="{{ url_for('athletes_list') }}" class="btn btn-outline-secondary">
+        <a href="{{ url_for('athletes_list', season=season) }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left"></i> Back to Athletes
         </a>
     </div>
@@ -147,10 +147,20 @@
 <!-- Progress Charts for each distance -->
 <div class="row">
     <div class="col-12">
-        <h3><i class="fas fa-chart-line text-success"></i> Progress Over Time</h3>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h3 class="mb-0"><i class="fas fa-chart-line text-success"></i> Progress Over Time</h3>
+            <div class="btn-group" role="group" aria-label="Chart season scope">
+                <button type="button" class="btn btn-outline-primary active" id="chartScopeCurrent">
+                    {{ current_season }} Season
+                </button>
+                <button type="button" class="btn btn-outline-primary" id="chartScopeAll">
+                    All Times
+                </button>
+            </div>
+        </div>
         <div class="card mb-3">
             <div class="card-header">
-                <h5>All Races Progress</h5>
+                <h5 id="progressChartTitle">All Races Progress ({{ current_season }} Season)</h5>
             </div>
             <div class="card-body">
                 <div id="progress-chart-all" style="height: 300px;"></div>
@@ -163,36 +173,56 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Fetch progress data for all races
-    console.log('DEBUG: Chart version 2.0 - Using athlete_id:', '{{ athlete_id }}');
-    console.log('Fetching data from: /api/athlete/{{ athlete_id }}/progress/all');
-    fetch('/api/athlete/{{ athlete_id }}/progress/all')
-        .then(response => {
-            console.log('Response status:', response.status);
-            return response.json();
-        })
+    const chartTitle = document.getElementById('progressChartTitle');
+    const currentBtn = document.getElementById('chartScopeCurrent');
+    const allBtn = document.getElementById('chartScopeAll');
+    let currentScope = 'current';
+
+    function setScopeButtons(scope) {
+        if (scope === 'current') {
+            currentBtn.classList.add('active');
+            allBtn.classList.remove('active');
+            chartTitle.textContent = 'All Races Progress ({{ current_season }} Season)';
+        } else {
+            currentBtn.classList.remove('active');
+            allBtn.classList.add('active');
+            chartTitle.textContent = 'All Races Progress (All Times)';
+        }
+    }
+
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return minutes + ':' + (secs < 10 ? '0' : '') + secs;
+    }
+
+    function renderNoData(scope) {
+        const message = scope === 'current'
+            ? 'No {{ current_season }} results yet for this athlete.'
+            : 'No race data found for this athlete.';
+
+        Plotly.newPlot('progress-chart-all', [], {
+            title: { text: message, font: { size: 16 } },
+            xaxis: { visible: false },
+            yaxis: { visible: false },
+            annotations: [{
+                text: message,
+                showarrow: false,
+                font: { size: 15, color: '#666' },
+            }],
+            margin: { t: 60, r: 20, b: 40, l: 40 },
+        });
+    }
+
+    function loadProgressChart(scope) {
+        fetch('/api/athlete/{{ athlete_id }}/progress/all?scope=' + scope)
+        .then(response => response.json())
         .then(data => {
-            console.log('Received data:', data);
             if (data.length > 0) {
                 const dates = data.map(d => d.date);
                 const fivek_times = data.map(d => d.five_k_time);
-                const formatted_fivek_times = data.map(d => d.formatted_five_k_time);
                 const paces = data.map(d => d.pace_seconds);
                 const meets = data.map(d => d.meet);
-                const formatted_paces = data.map(d => d.pace);
-
-                console.log('DEBUG - 5K times:', fivek_times);
-                console.log('DEBUG - Paces:', paces);
-                console.log('DEBUG - Dates:', dates);
-                console.log('DEBUG - 5K time range:', Math.min(...fivek_times), 'to', Math.max(...fivek_times));
-                console.log('DEBUG - Pace range:', Math.min(...paces), 'to', Math.max(...paces));
-
-                // Helper function to format seconds to MM:SS
-                function formatTime(seconds) {
-                    const minutes = Math.floor(seconds / 60);
-                    const secs = Math.floor(seconds % 60);
-                    return minutes + ':' + (secs < 10 ? '0' : '') + secs;
-                }
 
                 // 5k Time trace (primary y-axis)
                 const fivekTrace = {
@@ -224,12 +254,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     yaxis: 'y2'
                 };
 
-                console.log('DEBUG - fivekTrace:', fivekTrace);
-                console.log('DEBUG - paceTrace:', paceTrace);
-
                 const layout = {
                     title: {
-                        text: 'All Races Performance Over Time',
+                        text: scope === 'current' ? '{{ current_season }} Season Performance Over Time' : 'All-Time Performance Over Time',
                         font: {size: 16}
                     },
                     xaxis: {
@@ -289,24 +316,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     layout.yaxis2.ticktext.push(formatTime(val));
                 }
 
-                console.log('DEBUG - Layout:', layout);
-
-                console.log('DEBUG - Creating chart with traces...');
-
                 Plotly.newPlot('progress-chart-all', [fivekTrace, paceTrace], layout)
-                    .then(() => {
-                        console.log('Chart created successfully');
-                    })
                     .catch(error => {
                         console.error('Error creating chart:', error);
                     });
             } else {
-                console.log('No data received for chart');
+                renderNoData(scope);
             }
         })
         .catch(error => {
             console.error('Error fetching progress data:', error);
+            renderNoData(scope);
         });
+    }
+
+    currentBtn.addEventListener('click', function() {
+        currentScope = 'current';
+        setScopeButtons(currentScope);
+        loadProgressChart(currentScope);
+    });
+
+    allBtn.addEventListener('click', function() {
+        currentScope = 'all';
+        setScopeButtons(currentScope);
+        loadProgressChart(currentScope);
+    });
+
+    setScopeButtons(currentScope);
+    loadProgressChart(currentScope);
 });
 </script>
 {% endblock %}

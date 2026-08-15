@@ -6,7 +6,11 @@
 <div class="row mb-4">
     <div class="col">
         <h1><i class="fas fa-user-friends text-primary"></i> Athletes</h1>
-        <p class="lead">Browse all team members and their statistics</p>
+        <p class="lead">
+            {% if selected_season == current_season %}{{ current_season }} Season roster (current)
+            {% elif selected_season == 'all' %}All athletes — all seasons
+            {% else %}{{ selected_season }} Season roster{% endif %}
+        </p>
     </div>
 </div>
 
@@ -76,8 +80,20 @@
 <div class="row">
     <div class="col-12">
         <div class="alert alert-info">
-            <h4><i class="fas fa-info-circle"></i> No Athletes Found</h4>
-            <p>No athlete data is currently available. Make sure you've run the scraper to import race results.</p>
+            <h4><i class="fas fa-info-circle"></i>
+                {% if selected_season == current_season %}
+                    {{ current_season }} Season hasn't started yet!
+                {% else %}
+                    No Athletes Found
+                {% endif %}
+            </h4>
+            <p>
+                {% if selected_season == current_season %}
+                    Results will appear here once meets are completed. Use the season selector above to browse past seasons.
+                {% else %}
+                    No athlete data is available for this selection.
+                {% endif %}
+            </p>
         </div>
     </div>
 </div>

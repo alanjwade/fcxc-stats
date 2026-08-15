@@ -12,7 +12,35 @@
         </h1>
         <p class="lead text-fchs-purple">{{ tagline }}</p>
     </div>
+    <div class="col-auto d-flex align-items-start pt-2">
+        {% if selected_season == current_season %}
+            <span class="badge bg-fchs-gold text-dark fs-6 px-3 py-2">
+                <i class="fas fa-star"></i> {{ current_season }} Season — Current
+            </span>
+        {% elif selected_season == 'all' %}
+            <span class="badge bg-secondary fs-6 px-3 py-2">
+                <i class="fas fa-infinity"></i> All Records
+            </span>
+        {% else %}
+            <span class="badge bg-fchs-purple fs-6 px-3 py-2">
+                <i class="fas fa-history"></i> {{ selected_season }} Season
+            </span>
+        {% endif %}
+    </div>
 </div>
+
+{% if selected_season == current_season and (stats.total_results or 0) == 0 %}
+<!-- Current season has no data yet -->
+<div class="alert border-fchs-gold mb-5" style="background: linear-gradient(135deg, #f8f4ff 0%, #fff9e6 100%); border-left: 5px solid var(--fchs-gold) !important;">
+    <div class="d-flex align-items-center gap-3">
+        <i class="fas fa-flag fa-2x text-fchs-gold"></i>
+        <div>
+            <h5 class="mb-1 text-fchs-purple">The {{ current_season }} season is coming soon!</h5>
+            <p class="mb-1">Results will appear here as meets are completed. Use the season selector above to browse past seasons.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Statistics Cards -->
 <div class="row mb-5">
@@ -89,7 +117,7 @@
                 <i class="fas fa-download fa-3x text-fchs-purple mb-3"></i>
                 <h5 class="card-title text-fchs-purple">Export Data</h5>
                 <p class="card-text">Download a CSV with athlete performance data across all events.</p>
-                <a href="{{ url_for('export_csv') }}" class="btn btn-fchs-primary">
+                <a href="{{ url_for('export_csv') }}?season={{ selected_season }}" class="btn btn-fchs-primary">
                     <i class="fas fa-download"></i> Download CSV
                 </a>
             </div>
@@ -102,7 +130,7 @@
                 <i class="fas fa-users fa-3x text-fchs-gold mb-3"></i>
                 <h5 class="card-title text-fchs-purple">Team Statistics</h5>
                 <p class="card-text">View team performance with best times organized by gender.</p>
-                <a href="{{ url_for('team_stats') }}" class="btn btn-fchs-secondary">
+                <a href="{{ url_for('team_stats') }}?season={{ selected_season }}" class="btn btn-fchs-secondary">
                     <i class="fas fa-chart-bar"></i> View Stats
                 </a>
             </div>
@@ -115,7 +143,7 @@
                 <i class="fas fa-user-friends fa-3x text-fchs-purple mb-3"></i>
                 <h5 class="card-title text-fchs-purple">Athlete Profiles</h5>
                 <p class="card-text">Browse individual athlete statistics and performance progression.</p>
-                <a href="{{ url_for('athletes_list') }}" class="btn btn-fchs-primary">
+                <a href="{{ url_for('athletes_list') }}?season={{ selected_season }}" class="btn btn-fchs-primary">
                     <i class="fas fa-list"></i> Browse Athletes
                 </a>
             </div>
