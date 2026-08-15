@@ -55,3 +55,18 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Trigger homelab-infra deployment update
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.HOMELAB_INFRA_REPO_TOKEN }}
+          repository: alanjwade/homelab-infra
+          event-type: fcxc-stats-release
+          client-payload: |
+            {
+              "tag": "${{ github.ref_name }}",
+              "image": "ghcr.io/alanjwade/fcxc-stats:${{ github.ref_name }}",
+              "repo": "${{ github.repository }}",
+              "sha": "${{ github.sha }}"
+            }

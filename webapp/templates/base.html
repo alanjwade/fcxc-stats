@@ -27,6 +27,18 @@
             align-items: center;
             gap: 10px;
         }
+
+        .navbar .nav-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            white-space: nowrap;
+        }
+
+        .navbar .dropdown-item,
+        .navbar .dropdown-header {
+            white-space: nowrap;
+        }
         
         .logo-img {
             height: 40px;
@@ -190,7 +202,7 @@
                            href="#" id="seasonDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"
                            style="border-color: var(--fchs-gold) !important;">
                             <i class="fas fa-calendar-alt text-fchs-gold"></i>
-                            <span class="text-fchs-gold fw-bold">
+                            <span class="text-fchs-gold fw-bold" style="white-space: nowrap;">
                                 {% if selected_season == current_season %}{{ current_season }} Season
                                 {% elif selected_season == 'all' %}All Records
                                 {% else %}{{ selected_season }} Season{% endif %}

@@ -90,6 +90,8 @@ git push origin v1.0.0
 
 GitHub Actions will build and push the image as `ghcr.io/alanjwade/fcxc-stats:v1.0.0`.
 
+**Important:** the workflow now also sends a repository-dispatch event to the `homelab-infra` repository so the compose file can be updated automatically.
+
 **Option B: Push to main (automatic, uses SHA tags)**
 
 ```bash
@@ -101,27 +103,62 @@ GitHub Actions will build and push with tags:
 - `latest` (for the latest main commit)
 - `sha-abc123d` (for the specific commit)
 
-**Then update `homelab-deployment/docker-compose.yml`:**
+This is useful for testing, but the production release flow is still the tagged version.
+
+### Step 2 — Set the secret for the cross-repo trigger
+
+Create a GitHub Actions secret in this repository named `HOMELAB_INFRA_REPO_TOKEN`.
+
+It should be a PAT with access to `alanjwade/homelab-infra` and at least `contents:write` permission. This allows the app repo workflow to trigger the infra repo automation.
+
+### Step 3 — Infra repo automation updates the compose file
+
+In `homelab-infra`, add a workflow that listens for the `fcxc-stats-release` repository dispatch event and updates the image tag in the service compose file.
+
+Example workflow:
 
 ```yaml
-image: ghcr.io/alanjwade/fcxc-stats:v1.0.0  # use the tag from Step 1
+name: Update fcxc-stats image
+
+on:
+  repository_dispatch:
+    types: [fcxc-stats-release]
+
+jobs:
+  update-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update image tag
+        run: |
+          sed -i "s|ghcr.io/alanjwade/fcxc-stats:.*|ghcr.io/alanjwade/fcxc-stats:${{ github.event.client_payload.tag }}|" \
+            hosts/homelab01/fcxc-stats/docker-compose.yml
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add hosts/homelab01/fcxc-stats/docker-compose.yml
+          git commit -m "Update fcxc-stats to ${{ github.event.client_payload.tag }}" || exit 0
+          git push
 ```
 
-Check [Packages](https://github.com/alanjwade/fcxc-stats/pkgs/container/fcxc-stats) to see available tags.
+This keeps the tag update in the infra repo fully automated.
 
-### Step 2 — Copy files to homelab-infra (one-time)
+### Step 4 — Server deployment
+
+On homelab01, pull the latest infra repo and redeploy:
 
 ```bash
-scp -r homelab-deployment/ homelab@homelab01:~/homelab-infra/hosts/homelab01/fcxc-stats
+cd ~/homelab-infra
+git pull --ff-only
+cd hosts/homelab01/fcxc-stats
+docker compose pull
+docker compose up -d
 ```
 
-For subsequent updates, re-copy only the compose file after updating the tag:
-
-```bash
-scp homelab-deployment/docker-compose.yml homelab@homelab01:~/homelab-infra/hosts/homelab01/fcxc-stats/
-```
-
-### Step 3 — First-time server setup (one-time)
+### Step 5 — First-time server setup (one-time)
 
 On homelab01:
 
@@ -143,7 +180,7 @@ docker compose up -d
 docker compose logs -f
 ```
 
-### Step 5 — Seed the database (first time only)
+### Step 6 — Seed the database (first time only)
 
 Run the scraper locally, then copy the database to the server:
 
@@ -161,12 +198,16 @@ To push a new version to production:
    git tag v1.0.1
    git push origin v1.0.1
    ```
-3. Wait for [Actions](https://github.com/alanjwade/fcxc-stats/actions) to build
-4. Update `homelab-deployment/docker-compose.yml` with the new tag (e.g., `v1.0.1`)
-5. Deploy:
+3. Wait for the GitHub Action in this repo to build and push the image
+4. The workflow triggers the `homelab-infra` update automatically
+5. The infra repo updates the compose tag and pushes the change
+6. On the server, pull and redeploy:
    ```bash
-   scp homelab-deployment/docker-compose.yml homelab@homelab01:~/homelab-infra/hosts/homelab01/fcxc-stats/
-   ssh homelab@homelab01 'cd ~/homelab-infra/hosts/homelab01/fcxc-stats && docker compose pull && docker compose up -d'
+   cd ~/homelab-infra
+   git pull --ff-only
+   cd hosts/homelab01/fcxc-stats
+   docker compose pull
+   docker compose up -d
    ```
 
 ### Backup
