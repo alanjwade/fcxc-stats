@@ -25,6 +25,10 @@ import uuid
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Home team school names used to validate that a parse actually produced this
+# team's results (Fort Collins HS). Matches the school-normalization mappings.
+HOME_TEAM_NAMES = ['Fort Collins High School', 'Fort Collins HS', 'FCHS', 'Fort Collins']
+
 # Map the auto-detected modular parser class name to the proven scraping
 # algorithm implemented in this class. These proven methods are known to
 # reproduce the production database exactly for the existing data formats.
@@ -1145,6 +1149,30 @@ class MileSplitScraper:
         if matched_results is None:
             logger.warning(f"No matching section found for '{race_key}' in {list(sections.keys())}")
             return []
+
+        # Validate that the chosen parser actually produced sensible results
+        # (results present, home team represented, times in range, places sane).
+        try:
+            from parsers.base import validate_parsed_results
+            vreport = validate_parsed_results(
+                matched_results,
+                team_names=HOME_TEAM_NAMES,
+                distance=race_config.distance if race_config else None,
+            )
+            if not vreport['ok']:
+                logger.warning(
+                    f"Parser {parser_name} produced results that fail validation "
+                    f"for {source}: failures={vreport['failures']} "
+                    f"(total={vreport['total']})."
+                )
+            else:
+                logger.info(
+                    f"Parser {parser_name} passed validation for {source}: "
+                    f"{vreport['total']} results, "
+                    f"home-team={vreport['details'].get('home_team_count', 'n/a')}."
+                )
+        except Exception as exc:
+            logger.warning(f"Validation skipped for {source}: {exc}")
 
         db_gender = self.map_gender_for_db(race_config.gender) if race_config else 'male'
         results = []

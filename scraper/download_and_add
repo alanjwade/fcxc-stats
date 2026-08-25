@@ -1,0 +1,12 @@
+#!/bin/bash
+# Wrapper script to run download_and_add.py with the correct Python environment.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_PYTHON="$SCRIPT_DIR/.venv/bin/python"
+
+if [ ! -f "$VENV_PYTHON" ]; then
+    echo "Error: Virtual environment not found at $VENV_PYTHON"
+    exit 1
+fi
+
+exec "$VENV_PYTHON" "$SCRIPT_DIR/download_and_add.py" "$@"

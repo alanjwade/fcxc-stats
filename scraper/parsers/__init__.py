@@ -21,6 +21,7 @@ from . import regionals_table
 from . import longs_peak
 from . import loveland_sweetheart
 from . import raw_combined
+from . import milesplit_api
 from . import default_parser
 
 
@@ -31,6 +32,42 @@ def find_parser(content: str) -> BaseParser:
         if parser.can_parse(content):
             return parser
     return None
+
+
+def find_valid_parser(content: str, team_names=None, distance=None):
+    """Return the first parser whose extracted results pass validation.
+
+    Unlike find_parser (which only checks can_parse), this runs each capable
+    parser's extract_races() and validates the output via
+    parsers.base.validate_parsed_results, so the chosen parser is one that
+    actually yields sensible results (home-team present, reasonable times, etc.).
+
+    Returns (parser, sections, report). If no candidate validates, returns
+    (None, {}, report) with a report reflecting the best attempt.
+    """
+    from .base import validate_parsed_results
+
+    best = None
+    best_report = None
+    for parser_cls in ParserRegistry.get_all():
+        parser = parser_cls()
+        try:
+            if not parser.can_parse(content):
+                continue
+            sections = parser.extract_races(content)
+        except Exception:
+            continue
+        if not sections:
+            continue
+        flat = [r for lst in sections.values() for r in lst]
+        report = validate_parsed_results(flat, team_names=team_names, distance=None)
+        if best_report is None or report['total'] > best_report.get('total', 0):
+            best = parser
+            selected = sections
+            best_report = report
+        if report['ok']:
+            return parser, sections, report
+    return best, (selected if best else {}), best_report
 
 
 def get_parser_names() -> list[str]:

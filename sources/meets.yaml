@@ -514,6 +514,78 @@ meets:
         distance: "5K"
         class: "varsity"
         gender: "girls"
+  # ===========================================================================
+  # Rocky Mountain Lobo Invitational 2026
+  # Source: 1 HTML file (girls_varsity.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Rocky Mountain Lobo Invitational 2026"
+    date: "2026-08-21"
+    venue: "Spring Canyon Park, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/rocky_mountain_lobo_invitational/girls_varsity.html"
+    races:
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Rocky Mountain Lobo Invitational 2026
+  # Source: 1 HTML file (girls_jv.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Rocky Mountain Lobo Invitational 2026"
+    date: "2026-08-21"
+    venue: "Spring Canyon Park, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/rocky_mountain_lobo_invitational/girls_jv.html"
+    races:
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+  # ===========================================================================
+  # Rocky Mountain Lobo Invitational 2026
+  # Source: 1 HTML file (boys_jv.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Rocky Mountain Lobo Invitational 2026"
+    date: "2026-08-21"
+    venue: "Spring Canyon Park, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/rocky_mountain_lobo_invitational/boys_jv.html"
+    races:
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+  # ===========================================================================
+  # Rocky Mountain Lobo Invitational 2026
+  # Source: 1 HTML file (boys_varsity.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Rocky Mountain Lobo Invitational 2026"
+    date: "2026-08-21"
+    venue: "Spring Canyon Park, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/rocky_mountain_lobo_invitational/boys_varsity.html"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+
+
+
+
 
 # =============================================================================
 # Team information
@@ -524,3 +596,6 @@ team:
   colors:
     primary: "#FF0000"
     secondary: "#FFFFFF"
+
+
+

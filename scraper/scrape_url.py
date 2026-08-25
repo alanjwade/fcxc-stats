@@ -153,8 +153,13 @@ def seconds_to_mark(seconds: float) -> str:
 
 def fetch_results(url: str, wait_seconds: int = 8) -> dict:
     """
-    Load the MileSplit page via Playwright, intercept the API call,
-    and return the raw API JSON data.
+    Load the MileSplit page via Playwright, intercept the internal
+    performances API call, and return the raw API JSON data.
+
+    Uses page.expect_response() to capture the API payload instead of reading
+    the body from a plain 'response' event, which can fail with
+    "Response body is not available for a response that was navigated away"
+    for subresource/frame responses.
     """
     api_data = None
     api_url = None
@@ -175,33 +180,36 @@ def fetch_results(url: str, wait_seconds: int = 8) -> dict:
         page.add_init_script(
             'Object.defineProperty(navigator, "webdriver", {get: () => undefined})'
         )
-
-        def handle_response(response):
-            nonlocal api_data, api_url
-            if 'milesplit.com/api' in response.url and 'performances' in response.url:
-                api_url = response.url
-                try:
-                    api_data = response.json()
-                except Exception:
-                    try:
-                        api_data = {'_raw': response.body().decode('utf-8', errors='replace')}
-                    except Exception:
-                        pass
-
-        page.on('response', handle_response)
         page.set_default_timeout(60000)
-        
-        print(f"Loading: {url}", file=sys.stderr)
-        page.goto(url, wait_until='load')
-        
-        print(f"Waiting {wait_seconds}s for API response...", file=sys.stderr)
-        time.sleep(wait_seconds)
-        
-        browser.close()
+
+        try:
+            print(f"Loading: {url}", file=sys.stderr)
+            print(f"Waiting up to {wait_seconds}s for API response...", file=sys.stderr)
+            # Register the expectation BEFORE navigation so we don't miss the
+            # API call that the page fires during load. The with-block blocks
+            # until the response arrives or the wait budget is exhausted.
+            with page.expect_response(
+                lambda r: 'milesplit.com/api' in r.url and 'performances' in r.url,
+                timeout=wait_seconds * 1000,
+            ) as response_info:
+                page.goto(url, wait_until='domcontentloaded', timeout=30000)
+            api_url = response_info.value.url
+            try:
+                api_data = response_info.value.json()
+            except Exception:
+                try:
+                    api_data = {'_raw': response_info.value.body().decode('utf-8', errors='replace')}
+                except Exception:
+                    pass
+        except Exception:
+            # The API call didn't arrive within wait_seconds (or load failed).
+            api_data = None
+        finally:
+            browser.close()
 
     if api_data is None:
         raise RuntimeError("No API data captured. The page may not have loaded results.")
-    
+
     if api_data.get('_meta', {}).get('status_code') not in (200, None):
         status = api_data.get('_meta', {}).get('status_code')
         error = api_data.get('error', {}).get('message', 'Unknown error')
@@ -261,7 +269,7 @@ def build_results_json(results: list, params: dict, meet_name: str = '') -> list
     return output
 
 
-def scrape(url: str, output_dir: str = None, text_only: bool = False, json_only: bool = False) -> dict:
+def scrape(url: str, output_dir: str = None, text_only: bool = False, json_only: bool = False, wait_seconds: int = 8) -> dict:
     """
     Main scrape function. Returns dict with 'text' and 'json' keys.
     Optionally writes files to output_dir.
@@ -274,7 +282,7 @@ def scrape(url: str, output_dir: str = None, text_only: bool = False, json_only:
     print(f"Meet ID: {params['meet_id']}", file=sys.stderr)
     print(f"Filters: event={params['event']}, gender={params['gender']}, division={params['division']}", file=sys.stderr)
 
-    api_data = fetch_results(url)
+    api_data = fetch_results(url, wait_seconds=wait_seconds)
     
     all_results = api_data.get('data', [])
     print(f"Total API results: {len(all_results)}", file=sys.stderr)
@@ -334,6 +342,7 @@ def main():
             output_dir=args.output_dir,
             text_only=args.text_only,
             json_only=args.json_only,
+            wait_seconds=args.wait,
         )
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)

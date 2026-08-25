@@ -9,6 +9,7 @@ __init_subclass__ hook.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
+import re
 
 
 @dataclass
@@ -203,3 +204,121 @@ class BaseParser(ABC):
         """Remove HTML tags from a string."""
         import re
         return re.sub(r'<[^>]+>', '', html).strip()
+
+
+def distance_meters(distance: str) -> Optional[int]:
+    """Convert a distance token from YAML ('5K', '1600m', '2M', ...) to meters."""
+    if not distance:
+        return None
+    d = str(distance).strip().lower().replace(' ', '')
+    m = re.match(r'(\d+(?:\.\d+)?)\s*(m|k|km|mile)', d)
+    if not m:
+        return None
+    val, unit = float(m.group(1)), m.group(2)
+    if unit == 'k':
+        return int(val * 1000)
+    if unit == 'km':
+        return int(val * 1000)
+    if unit == 'mile':
+        return int(val * 1609.34)
+    if unit == 'm':
+        return int(val)
+    return None
+
+
+def time_bounds_for_distance(distance: str) -> tuple:
+    """Reasonable time window (min_seconds, max_seconds) for a race distance.
+
+    Base window is the cross-country 5K band deemed plausible (10–50 minutes,
+    i.e. 600–3000 s), scaled linearly by distance.
+    """
+    d_m = distance_meters(distance)
+    if not d_m or d_m <= 0:
+        return (600, 3000)
+    factor = d_m / 5000.0
+    return (max(120, int(600 * factor)), int(3000 * factor))
+
+
+def validate_parsed_results(results, team_names=None, distance=None) -> dict:
+    """Sanity-check a list of ParsedResult for an obviously-broken parse.
+
+    Returns a report dict:
+      {
+        'total': n,
+        'ok': bool,                 # True if every "required" criterion passed
+        'criteria': {name: bool|None},
+        'failures': [names of failed criteria],
+        'details': {...},
+      }
+
+    Required criteria (when applicable):
+      - parse_results   : at least one result survived extraction.
+      - has_home_team   : some result is from the home school (Fort Collins).
+                          Enforced only if team_names is provided.
+      - times_reasonable: every time is within the distance's time window.
+      - places_valid    : places are positive and ascending (not garbage).
+    """
+    results = list(results or [])
+    report = {
+        'total': len(results),
+        'criteria': {},
+        'failures': [],
+        'details': {},
+    }
+
+    # 1) Parsed results present.
+    ok = len(results) > 0
+    report['criteria']['parsed_results'] = ok
+    if not ok:
+        report['failures'].append('parsed_results')
+
+    # 2) Home team presence (only when we know which team to look for).
+    home_names = [n for n in (team_names or []) if n]
+    if home_names:
+        normalized = [n.lower().strip() for n in home_names]
+        home_count = 0
+        for r in results:
+            school = (r.school or '').lower().strip()
+            if any(n == school or n in school or school in n for n in normalized):
+                home_count += 1
+        report['details']['home_team_count'] = home_count
+        ok = home_count > 0
+        report['criteria']['has_home_team'] = ok
+        if not ok:
+            report['failures'].append('has_home_team')
+    else:
+        report['criteria']['has_home_team'] = None
+
+    # 3) Reasonable times.
+    min_s, max_s = time_bounds_for_distance(distance or '')
+    out_of_range = []
+    for r in results:
+        if r.time_seconds is None:
+            continue
+        if r.time_seconds < min_s or r.time_seconds > max_s:
+            out_of_range.append((r.first_name, r.last_name, r.time_seconds))
+    ok_out = len(out_of_range) == 0
+    report['criteria']['times_reasonable'] = ok_out
+    report['details']['out_of_range'] = out_of_range
+    if not ok_out:
+        report['failures'].append('times_reasonable')
+
+    # 4) Places valid (ascending, positive).
+    bad_places = []
+    last = 0
+    for r in results:
+        placeless = r.place is None or r.place < 1
+        if placeless:
+            bad_places.append((r.first_name, r.last_name, r.place))
+        else:
+            if r.place < last:
+                bad_places.append((r.first_name, r.last_name, r.place))
+        last = r.place
+    ok_places = len(bad_places) == 0
+    report['criteria']['places_valid'] = ok_places
+    report['details']['bad_places'] = bad_places
+    if not ok_places:
+        report['failures'].append('places_valid')
+
+    report['ok'] = not report['failures']
+    return report
