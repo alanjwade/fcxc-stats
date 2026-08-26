@@ -1,63 +1,65 @@
 # Deployment, Versioning & cross-workspace relationship
 
-Two repos work together. Keep the split clear:
+Two repos (or more, for future apps) work together. Keep the split clean:
 
 - **`fcxc_stats` (this repo)** — app source of truth. All code lives here.
-- **`homelab-infra`** (sibling workspace) — deployment wiring. The deployed
-  compose config lives at `homelab-infra/hosts/homelab01/fcxc-stats/`.
-  Code changes go here in `fcxc_stats`; **compose/version/deploy changes go to
-  homelab-infra**. Don't edit the app code as if it lived in the infra repo, and
-  don't change deployment wiring in this repo as a substitute for the infra repo.
+- **`homelab-infra`** (sibling workspace) — the only place that knows anything
+  about where/what the app runs on.
 
-## `homelab-deployment/` — the bridge
+## The split
 
-This folder holds the **three files** that are mirrored into the infra repo's
-`hosts/homelab01/fcxc-stats/`:
+- **This repo's only job is to ship a container image.** On a `v*` release tag,
+  `.github/workflows/build-push.yml` builds and publishes
+  `ghcr.io/alanjwade/fcxc-stats:<tag>`. That's it — it does not touch, notify,
+  or know anything about a host, a compose file, a deploy path, or a machine.
+- **homelab-infra owns all deployment.** The pinned image tag, the compose
+  file, the host, and the up-to-date check live in
+  `homelab-infra/hosts/homelab01/fcxc-stats/`. A general-purpose script there
+  (`homelab-infra/scripts/update-apps.sh`) watches GHCR, bumps the pinned tag,
+  commits/pushes, then sshs into the host to `git pull` + `docker compose pull`
+  + `docker compose up -d`. homelab-infra discovers this app because that
+  service folder carries an `app.yml` manifest.
 
-- `homelab-deployment/docker-compose.yml`  →  `hosts/homelab01/fcxc-stats/docker-compose.yml`
-- `homelab-deployment/.env.example`        →  `hosts/homelab01/fcxc-stats/.env.example`
-- `homelab-deployment/backup.yml`          →  `hosts/homelab01/fcxc-stats/backup.yml`
+## Release flow
 
-Keep these in sync if you change one side. The `docker-compose.yml` pins
-`image: ghcr.io/alanjwade/fcxc-stats:<tag>` and mounts
-`/opt/homelab/fcxc-stats/data:/data`.
-
-## Release flow (bump + tag → GHCR → infra auto-update → deploy)
-
-1. **Bump & tag (local):**
+1. **Create & push the release tag (local).** `bump_release.sh` is the single
+   command to ship a release. On a clean tree it reads the newest `vX.Y.Z` tag,
+   computes the next version (patch by default; `minor`/`major` accepted),
+   pushes the branch HEAD, and creates/pushes the new tag:
    ```bash
-   ./bump_version_homelab01.sh             # patch bump (v1.0.0 → v1.0.1)
-   ./bump_version_homelab01.sh minor       # v1.0.0 → v1.1.0
-   ./bump_version_homelab01.sh major       # v1.0.0 → v2.0.0
+   ./bump_release.sh          # v1.0.7 -> v1.0.8
+   ./bump_release.sh minor    # v1.0.7 -> v1.1.0
    ```
-   It requires a clean working tree, updates the tag in
-   `homelab-deployment/docker-compose.yml`, commits, pushes, and creates/pushes
-   a `v*` git tag.
+   It is **target-agnostic** — it makes no file edits and knows nothing about the
+   deployment host. The version is not stored in any committed file.
 
-2. **CI builds (GitHub):** `.github/workflows/build-push.yml` triggers on
-   `v*` tags, builds `ghcr.io/alanjwade/fcxc-stats:<tag>`, pushes it, and
-   dispatches a `fcxc-stats-release` event to `homelab-infra` (needs the
-   `HOMELAB_INFRA_REPO_TOKEN` secret). A workflow in homelab-infra then
-   re-writes the deployed compose image tag and commits.
+2. **CI publishes the image only (GitHub):** `build-push.yml` builds and pushes
+   `ghcr.io/alanjwade/fcxc-stats:<tag>`, passing `APP_VERSION=<tag>` as a build
+   arg. Nothing else happens — no notification to homelab-infra and no
+   infrastructure knowledge in this repo.
 
-3. **Deploy (remote):**
+3. **The tag appears in the webapp footer.** The Dockerfile stores the build-time
+   `APP_VERSION` as a runtime env var; Flask injects it (`app.context_processor`)
+   and `base.html` renders it. Locally (no Docker) it falls back to `dev`.
+   The footer therefore always reflects the version of the running image.
+
+4. **homelab-infra deploys it (on the host / from the infra checkout):**
    ```bash
-   ./deploy_homelab01.sh
+   cd homelab-infra && ./scripts/update-apps.sh
+   # or just one app:  ./scripts/update-apps.sh fcxc-stats
    ```
-   Verifies the image exists in GHCR, SSHes to homelab01, and restarts the
-   container with the new image.
 
 ## Environment rule
 
 - Never hardcode machine-specific secrets or the production `SECRET_KEY` in
   committed files. Config comes from `.env` (`cp .env.example .env`, fill real
-  values). The committed `docker-compose.yml` reads env vars
+  values). The committed `docker-compose.yml` (in homelab-infra) reads env vars
   (`VIRTUAL_HOST`, `TZ`, `DATABASE_URL`) and never commits `.env`.
 
 ## Data / backups
 
 - The SQLite database lives on the server at `/opt/homelab/fcxc-stats/data/`,
-  declared in `homelab-deployment/backup.yml` (`local: true`, `offsite: false`,
-  no `pre_backup` — raw SQLite file is backed up directly).
-- To seed the server DB from local data: `scp data/fcxc_stats.db
-  homelab@homelab01:/opt/homelab/fcxc-stats/data/`.
+  declared in homelab-infra's `hosts/homelab01/fcxc-stats/backup.yml`
+  (`local: true`, `offsite: false`, no `pre_backup` — the raw SQLite file is
+  backed up directly). This repo does not need to concern itself with it; the
+  backup builder lives in homelab-infra.

@@ -30,6 +30,16 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
+# Release tag embedded in the image at build time (Dockerfile ARG APP_VERSION);
+# falls back to 'dev' for local runs. Exposed to every template.
+APP_VERSION = os.environ.get('APP_VERSION', 'dev')
+
+
+@app.context_processor
+def inject_app_version():
+    return {'app_version': APP_VERSION}
+
+
 # Database connection
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:

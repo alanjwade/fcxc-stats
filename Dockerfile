@@ -15,7 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY webapp/ .
+WORKDIR /app
 COPY config/ /app/config/
+
+# Persist the build-time version as a runtime env var the app reads.
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 
 # Create data directory for database
 RUN mkdir -p /data
