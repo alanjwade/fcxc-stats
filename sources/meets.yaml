@@ -582,6 +582,132 @@ meets:
         distance: "5K"
         class: "varsity"
         gender: "boys"
+  # ===========================================================================
+  # John Martin XC Invitational 2026
+  # Source: 1 HTML file (boys_varsity.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "John Martin XC Invitational 2026"
+    date: "2026-08-29"
+    venue: "Fort Collins HS XC Course, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/john_martin_xc_invitational/boys_varsity.html"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+  # ===========================================================================
+  # John Martin XC Invitational 2026
+  # Source: 1 HTML file (boys_jv.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "John Martin XC Invitational 2026"
+    date: "2026-08-29"
+    venue: "Fort Collins HS XC Course, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/john_martin_xc_invitational/boys_jv.html"
+    races:
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+  # ===========================================================================
+  # John Martin XC Invitational 2026
+  # Source: 1 HTML file (girls_varsity.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "John Martin XC Invitational 2026"
+    date: "2026-08-29"
+    venue: "Fort Collins HS XC Course, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/john_martin_xc_invitational/girls_varsity.html"
+    races:
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # John Martin XC Invitational 2026
+  # Source: 1 HTML file (girls_varsity.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "John Martin XC Invitational 2026"
+    date: "2026-08-29"
+    venue: "Fort Collins HS XC Course, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/john_martin_xc_invitational/girls_varsity.html"
+    races:
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # John Martin XC Invitational 2026
+  # Source: 1 HTML file (girls_varsity.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "John Martin XC Invitational 2026"
+    date: "2026-08-29"
+    venue: "Fort Collins HS XC Course, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/john_martin_xc_invitational/girls_varsity.html"
+    races:
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # John Martin XC Invitational 2026
+  # Source: 1 HTML file (girls_varsity.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "John Martin XC Invitational 2026"
+    date: "2026-08-29"
+    venue: "Fort Collins HS XC Course, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/john_martin_xc_invitational/girls_varsity.html"
+    races:
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # John Martin XC Invitational 2026
+  # Source: 1 HTML file (girls_varsity.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "John Martin XC Invitational 2026"
+    date: "2026-08-29"
+    venue: "Fort Collins HS XC Course, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/john_martin_xc_invitational/girls_varsity.html"
+    races:
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+
+
+
+
+
+
+
 
 
 
@@ -596,6 +722,13 @@ team:
   colors:
     primary: "#FF0000"
     secondary: "#FFFFFF"
+
+
+
+
+
+
+
 
 
 

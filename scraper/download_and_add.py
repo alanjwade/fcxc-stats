@@ -100,6 +100,13 @@ def filter_api_for_url(api_data, url):
                    "female": "Girls", "male": "Boys"}
     target_gender = gender_map.get((q["gender"] or "").lower(), q["gender"]) if q["gender"] else None
     target_division = (q["division"] or "").strip() or None
+    # MileSplit labels a race where "everyone runs in one race" (no Varsity/JV
+    # split) as "Complete". Rows in such a pooled race carry divisionName=None
+    # because there is no real division, so filtering on divisionName ==
+    # "Complete" would match nothing. Treat Complete/all/combined as "filter by
+    # no division" — gender + distance already isolate the race.
+    if target_division and target_division.lower() in ("complete", "all", "combined"):
+        target_division = None
 
     filtered = data
     if target_distance is not None:

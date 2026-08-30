@@ -51,7 +51,7 @@ TAGLINES = [
     "Who wears short shorts? We wear short shorts.",
     "Our sport is your sport's punishment.",
     "5K? We do that before breakfast.",
-    "Your sport's warmup is our workout.",
+    "Your sport's workout is our warmup.",
     "Pain is temporary. PRs are forever.",
     "Mud is just a free exfoliant.",
     "Hills don't scare us. Hills motivate us. Hills are lying.",
