@@ -701,6 +701,258 @@ meets:
         distance: "5K"
         class: "varsity"
         gender: "girls"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (girls_division_1_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/girls_division_1_5k.html"
+    races:
+      - name: "Division 1 Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (girls_division_1_5k_2.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/girls_division_1_5k_2.html"
+    races:
+      - name: "Division 1 Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (girls_division_1_5k_3.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/girls_division_1_5k_3.html"
+    races:
+      - name: "Division 1 Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (girls_division_1_5k_4.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/girls_division_1_5k_4.html"
+    races:
+      - name: "Division 1 Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (girls_division_1_5k_5.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/girls_division_1_5k_5.html"
+    races:
+      - name: "Division 1 Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (girls_jv_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/girls_jv_5k.html"
+    races:
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (girls_open_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/girls_open_5k.html"
+    races:
+      - name: "Open Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (boys_division_1_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/boys_division_1_5k.html"
+    races:
+      - name: "Division 1 Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (boys_division_1_5k_2.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/boys_division_1_5k_2.html"
+    races:
+      - name: "Division 1 Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (boys_division_1_5k_3.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/boys_division_1_5k_3.html"
+    races:
+      - name: "Division 1 Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (boys_division_1_5k_4.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/boys_division_1_5k_4.html"
+    races:
+      - name: "Division 1 Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (boys_division_1_5k_5.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/boys_division_1_5k_5.html"
+    races:
+      - name: "Division 1 Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (boys_jv_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/boys_jv_5k.html"
+    races:
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+  # ===========================================================================
+  # Liberty Bell Cross Country Invitational 2026
+  # Source: 1 HTML file (boys_open_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Liberty Bell Cross Country Invitational 2026"
+    date: "2026-09-05"
+    venue: "Heritage High School XC Course, Littleton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/liberty_bell_cross_country_invitational/boys_open_5k.html"
+    races:
+      - name: "Open Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -722,6 +974,20 @@ team:
   colors:
     primary: "#FF0000"
     secondary: "#FFFFFF"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

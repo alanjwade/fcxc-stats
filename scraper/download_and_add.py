@@ -12,6 +12,8 @@ Usage:
     python download_and_add.py <URL> --season 2026 --date 2026-08-21 \
         --venue "Spring Canyon Park, Fort Collins CO" --distance 5K \
         --class varsity --gender girls --name girls_varsity
+    python download_and_add.py <MEET_FORMATTED_URL> --dry-run \
+        --filter-distance 5K --filter-gender boys --filter-gender girls
 
 Overrides (use to correct anything not inferred correctly):
     Meet name: --meet     Date: --date      Season: --season   Venue: --venue
@@ -27,7 +29,7 @@ import json
 import os
 import re
 import sys
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from bs4 import BeautifulSoup
 
@@ -78,6 +80,129 @@ _EVENT_DISTANCE = {
     "1600m": 1600, "800m": 800, "400m": 400,
     "2mile": 3218, "2m": 3218, "mile": 1609,
 }
+
+EVENT_PARAM_BY_DISTANCE = {
+    5000: "5000m",
+    3000: "3000m",
+    1600: "1600m",
+    800: "800m",
+    400: "400m",
+    3218: "2mile",
+    1609: "mile",
+}
+
+
+def distance_from_meters(distance_m):
+    if distance_m is None:
+        return None
+    return DISTANCE_BY_EVENT.get(str(distance_m).lower()) or {
+        5000: "5K",
+        3000: "3K",
+        1600: "1600m",
+        800: "800m",
+        400: "400m",
+        3218: "2M",
+        1609: "1M",
+    }.get(distance_m)
+
+
+def normalize_distance_filter(value):
+    """Normalize distance filter values to canonical form (e.g. 5k -> 5K)."""
+    if value is None:
+        return None
+    v = str(value).strip().lower()
+    if not v:
+        return None
+    return DISTANCE_BY_EVENT.get(v, str(value).strip())
+
+
+def normalize_division_bucket(division_name):
+    """Map MileSplit division labels into local race-class buckets.
+
+    Rule requested for Liberty Bell style meets:
+      - JV and Open are both JV races
+      - everything else is Division 1
+    """
+    d = (division_name or "").strip().lower()
+    if any(k in d for k in ("jv", "junior varsity", "open")):
+        return "jv"
+    return "division1"
+
+
+def division_display_name(division_name):
+    d = (division_name or "").strip().lower()
+    if "open" in d:
+        return "Open"
+    if "jv" in d or "junior varsity" in d:
+        return "JV"
+    return "Division 1"
+
+
+def class_from_bucket(bucket):
+    return "jv" if bucket == "jv" else "varsity"
+
+
+def gender_from_api_name(name):
+    g = (name or "").strip().lower()
+    if g in ("boys", "men", "male"):
+        return "boys"
+    if g in ("girls", "women", "female"):
+        return "girls"
+    return "mixed"
+
+
+def build_race_url(base_url, event_param=None, gender_param=None, division_param=None):
+    """Build a formatted-results URL with race query filters."""
+    parsed = urlparse(base_url)
+    qs = parse_qs(parsed.query)
+    qs["type"] = ["formatted"]
+    if event_param:
+        qs["event"] = [event_param]
+    if gender_param:
+        qs["gender"] = [gender_param]
+    if division_param:
+        qs["division"] = [division_param]
+
+    query = urlencode([(k, v) for k, vals in qs.items() for v in vals], doseq=True)
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, query, parsed.fragment))
+
+
+def discover_race_groups(api_data):
+    """Return unique race groups from MileSplit API payload for meet-level URLs."""
+    data = api_data.get("data") if isinstance(api_data, dict) else None
+    if not isinstance(data, list):
+        return []
+
+    seen = set()
+    groups = []
+    for row in data:
+        event_distance = row.get("eventDistance")
+        gender_name = row.get("genderName")
+        division_name = row.get("divisionName")
+        key = (event_distance, (gender_name or "").strip(), (division_name or "").strip())
+        if key in seen:
+            continue
+        seen.add(key)
+        groups.append(
+            {
+                "event_distance": event_distance,
+                "gender_name": gender_name,
+                "division_name": division_name,
+                "bucket": normalize_division_bucket(division_name),
+                "division_display": division_display_name(division_name),
+            }
+        )
+
+    def sort_key(g):
+        # Stable ordering: distance asc, girls before boys, Division 1 then JV/Open.
+        gender_rank = {"Girls": 0, "Boys": 1}.get(g.get("gender_name"), 2)
+        div = (g.get("division_display") or "").lower()
+        div_rank = 0 if "division 1" in div else (1 if "jv" in div else 2)
+        dist = g.get("event_distance")
+        dist_rank = int(dist) if isinstance(dist, int) else 999999
+        return (dist_rank, gender_rank, div_rank, div)
+
+    return sorted(groups, key=sort_key)
 
 
 def filter_api_for_url(api_data, url):
@@ -242,7 +367,8 @@ def class_from_division(division):
     if "fresh" in d:
         return "freshman"
     if "open" in d:
-        return "open"
+        # Open is treated as JV for Liberty Bell style pages.
+        return "jv"
     if "var" in d:
         return "varsity"
     return None
@@ -417,13 +543,76 @@ def validate(meta):
     return missing
 
 
-def run(args):
-    """Orchestrate download, infer, confirm, write files + meets.yaml entry."""
-    url = args.url
+def is_meet_level_formatted_url(url):
+    """True when URL points at formatted results without race-level filters."""
+    q = parse_query(url)
+    parsed = urlparse(url)
+    qs = parse_qs(parsed.query)
+    is_formatted = (qs.get("type", [""])[0].lower() == "formatted")
+    has_any_filter = bool(q.get("event") or q.get("gender") or q.get("division"))
+    return is_formatted and not has_any_filter
+
+
+def build_meta_for_group(base_meta, group):
+    """Derive per-race metadata for one discovered race group."""
+    gender = gender_from_api_name(group.get("gender_name"))
+    bucket = group.get("bucket")
+    race_class = class_from_bucket(bucket)
+    distance = distance_from_meters(group.get("event_distance")) or "5K"
+    race_prefix = group.get("division_display") or ("JV" if bucket == "jv" else "Division 1")
+    race_name = f"{race_prefix} {GENDER_DISPLAY.get(gender, gender.title())}".strip()
+
+    meta = dict(base_meta)
+    meta.update(
+        {
+            "distance": distance,
+            "class": race_class,
+            "gender": gender,
+            "race_name": race_name,
+        }
+    )
+    return meta
+
+
+def apply_group_filters(groups, base_meta, args):
+    """Filter discovered meet race-groups by distance and/or gender flags."""
+    distance_filters = args.filter_distance or []
+    gender_filters = [g.lower() for g in (args.filter_gender or [])]
+
+    distance_set = set()
+    for d in distance_filters:
+        nd = normalize_distance_filter(d)
+        if nd:
+            distance_set.add(nd)
+    gender_set = {g for g in gender_filters if g in ("boys", "girls", "mixed")}
+
+    if not distance_set and not gender_set:
+        return groups
+
+    out = []
+    for group in groups:
+        meta = build_meta_for_group(base_meta, group)
+        if distance_set and meta.get("distance") not in distance_set:
+            continue
+        if gender_set and meta.get("gender") not in gender_set:
+            continue
+        out.append(group)
+    return out
+
+
+def default_filename_for_group(meta, group):
+    """Race-specific filename for meet-level expansion."""
+    gender = meta["gender"]
+    div = slugify((group.get("division_display") or "division1").replace(" ", "_"))
+    dist = slugify(meta.get("distance") or "results")
+    return f"{gender}_{div}_{dist}.html"
+
+
+def process_single_url(url, args):
+    """Existing single-race workflow for URLs that already include filters."""
     print(f"Downloading: {url}")
     html = download_html(url, wait_seconds=args.wait)
 
-    # Results for "formatted" pages arrive via the AJAX API, not the HTML shell.
     api_data = fetch_milesplit_api(url)
     if api_data and isinstance(api_data.get("data"), list) and api_data["data"]:
         filtered = filter_api_for_url(api_data, url)
@@ -450,17 +639,24 @@ def run(args):
         print_override_help()
         return 1
 
-    # Filename: allow explicit --name or default to gender_class.
     name_arg = args.name or None
     filename = (name_arg + ".html") if name_arg else default_filename(meta)
     dir_slug = args.dir or slugify(meta["meet_name"])
     season = meta["season"] or "unknown"
 
-    rel_path = f"pages/{season}/{dir_slug}/{filename}"
     page_path = write_page(html, season, dir_slug, filename)
     rel_path = os.path.relpath(page_path, SOURCES_DIR)
 
     entry = build_yaml_entry(meta, rel_path)
+
+    if args.dry_run:
+        print()
+        print("DRY RUN: no files written and meets.yaml unchanged.")
+        print(f"Would save page: {page_path}")
+        print("Would add meets.yaml entry:")
+        print(entry)
+        return 0
+
     insert_into_meets_yaml(args.meets_yaml, entry)
 
     print()
@@ -469,6 +665,99 @@ def run(args):
     print(entry)
     print("Next: run `python scraper/scraper.py --sources sources/meets.yaml`")
     return 0
+
+
+def process_meet_level_url(url, args):
+    """Expand one formatted meet URL into per-race downloads + YAML entries."""
+    print(f"Downloading meet page: {url}")
+    meet_html = download_html(url, wait_seconds=args.wait)
+
+    api_data = fetch_milesplit_api(url)
+    if not api_data or not isinstance(api_data.get("data"), list) or not api_data["data"]:
+        print("Error: could not fetch meet API results for a meet-level formatted URL.", file=sys.stderr)
+        return 1
+
+    base_meta = infer_metadata(url, meet_html, args)
+    groups = discover_race_groups(api_data)
+    groups = apply_group_filters(groups, base_meta, args)
+    if not groups:
+        print("No race groups match the requested filters.")
+        return 0
+
+    print(f"Discovered {len(groups)} race groups from meet API.")
+    preview = []
+    for g in groups:
+        m = build_meta_for_group(base_meta, g)
+        event_param = EVENT_PARAM_BY_DISTANCE.get(g.get("event_distance"))
+        race_url = build_race_url(
+            url,
+            event_param=event_param,
+            gender_param=g.get("gender_name"),
+            division_param=g.get("division_name"),
+        )
+        preview.append("  - " + m["race_name"] + f" ({m['distance']}) -> {race_url}")
+    print("\nRace entries to add:\n" + "\n".join(preview))
+
+    if args.dry_run:
+        season = base_meta["season"] or "unknown"
+        dir_slug = args.dir or slugify(base_meta["meet_name"])
+        print()
+        print("DRY RUN: no files written and meets.yaml unchanged.")
+        print(f"Would write under: pages/{season}/{dir_slug}/")
+        return 0
+
+    if not args.yes:
+        ans = input("\nProceed with all discovered races? [y/N] ").strip().lower()
+        if ans not in ("y", "yes"):
+            print("Cancelled.")
+            return 1
+
+    season = base_meta["season"] or "unknown"
+    dir_slug = args.dir or slugify(base_meta["meet_name"])
+    written = []
+    used_filenames = set()
+
+    for group in groups:
+        event_param = EVENT_PARAM_BY_DISTANCE.get(group.get("event_distance"))
+        gender_name = group.get("gender_name")
+        division_name = group.get("division_name")
+        race_url = build_race_url(url, event_param=event_param, gender_param=gender_name, division_param=division_name)
+
+        race_html = download_html(race_url, wait_seconds=args.wait)
+        filtered = filter_api_for_url(api_data, race_url)
+        race_html = embed_api_results(race_html, {"data": filtered.get("data", [])})
+
+        meta = build_meta_for_group(base_meta, group)
+        filename = default_filename_for_group(meta, group)
+        if filename in used_filenames:
+            stem = filename[:-5] if filename.endswith(".html") else filename
+            suffix = 2
+            candidate = f"{stem}_{suffix}.html"
+            while candidate in used_filenames:
+                suffix += 1
+                candidate = f"{stem}_{suffix}.html"
+            filename = candidate
+        used_filenames.add(filename)
+        page_path = write_page(race_html, season, dir_slug, filename)
+        rel_path = os.path.relpath(page_path, SOURCES_DIR)
+
+        entry = build_yaml_entry(meta, rel_path)
+        insert_into_meets_yaml(args.meets_yaml, entry)
+        written.append((page_path, entry))
+
+    print()
+    print(f"✓ Saved {len(written)} race page files under pages/{season}/{dir_slug}/")
+    print(f"✓ Added {len(written)} entries to {args.meets_yaml}")
+    print("Next: run `python scraper/scraper.py --sources sources/meets.yaml`")
+    return 0
+
+
+def run(args):
+    """Orchestrate download, infer, confirm, write files + meets.yaml entry."""
+    url = args.url
+    if is_meet_level_formatted_url(url):
+        return process_meet_level_url(url, args)
+    return process_single_url(url, args)
 
 
 def main(argv=None):
@@ -490,6 +779,12 @@ def main(argv=None):
     parser.add_argument("--name", help="Output file stem (no extension)")
     parser.add_argument("--dir", help="Source folder slug (meet slug)")
     parser.add_argument("--wait", type=int, default=3, help="Seconds to wait for JS render")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Preview what would be downloaded/added without writing files")
+    parser.add_argument("--filter-distance", action="append", default=[],
+                        help="Meet-level only: include only this distance (e.g. 5K). Can repeat.")
+    parser.add_argument("--filter-gender", action="append", default=[], choices=["boys", "girls", "mixed"],
+                        help="Meet-level only: include only this gender. Can repeat.")
     parser.add_argument("--yes", action="store_true", help="Skip the confirmation prompt")
     parser.add_argument("--meets-yaml", default=MEETS_YAML,
                         help=f"Target meets.yaml path (default: {MEETS_YAML})")
