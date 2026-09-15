@@ -25,6 +25,7 @@ the flag for each field (then re-run with corrections). Use --yes to skip.
 """
 
 import argparse
+import html
 import json
 import os
 import re
@@ -276,6 +277,20 @@ def extract_og(html):
             out[key] = content
     return out
 
+def clean_page_text(value):
+    """Decode HTML character references and collapse whitespace in page text.
+
+    Page text is not always entity-decoded for us: JSON-LD lives inside a
+    <script> tag, so BeautifulSoup hands it back verbatim and MileSplit's own
+    markup contains references like "Flyin&#039; Ryan Invitational". Decode
+    those here so plain text ("Flyin' Ryan Invitational") reaches meets.yaml
+    and the database.
+    """
+    if not value:
+        return value
+    return re.sub(r"\s+", " ", html.unescape(str(value))).strip()
+
+
 def infer_metadata(url, html, args):
     """Infer meet/race metadata from the URL + page, honoring CLI overrides."""
     q = parse_query(url)
@@ -283,13 +298,15 @@ def infer_metadata(url, html, args):
     og = extract_og(html)
 
     # Meet name ------------------------------------------------------
-    raw = ld.get("name") or ""
+    # Page-provided names may carry HTML character references (e.g.
+    # "Flyin&#039; Ryan Invitational" from the JSON-LD block) — decode them.
+    raw = clean_page_text(ld.get("name") or "")
     if not raw:
-        og_title = (og.get("og:title") or "").split(" - ")[0].strip()
+        og_title = clean_page_text((og.get("og:title") or "").split(" - ")[0])
         raw = og_title
     if not raw and q["url_slug"]:
-        raw = q["url_slug"].replace("-", " ").title()
-    meet_name = args.meet or raw or ""
+        raw = clean_page_text(q["url_slug"].replace("-", " ").title())
+    meet_name = clean_page_text(args.meet) or raw or ""
 
     # Season / date ---------------------------------------------------
     date = (args.date or ld.get("startDate") or "")[:10]
@@ -309,7 +326,7 @@ def infer_metadata(url, html, args):
         parts.append(f"{addr['addressLocality']} {addr['addressRegion']}")
     elif addr.get("addressRegion"):
         parts.append(addr["addressRegion"])
-    venue = args.venue or (", ".join(parts) if parts else None)
+    venue = args.venue or (clean_page_text(", ".join(parts)) if parts else None)
 
     # Race -------------------------------------------------------------
     distance = args.distance or distance_from_event(q["event"]) or distance_from_text(ld, og)

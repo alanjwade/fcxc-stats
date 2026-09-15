@@ -9,6 +9,7 @@ It reads configuration from a YAML file to determine which races to scrape.
 import os
 import sys
 import re
+import html
 import time
 import yaml
 import logging
@@ -44,6 +45,20 @@ PARSER_TO_ALGORITHM = {
     'NorthernConferenceParser': 'northern_conference',
     'RegionalsTableParser': 'regionals_table',
 }
+
+
+def clean_meet_name(value: str) -> str:
+    """Normalize a meets.yaml meet name before it reaches the database.
+
+    MileSplit's JSON-LD block carries HTML character references (e.g.
+    "Flyin&#039; Ryan Invitational"), and an older downloader run wrote that
+    text straight into meets.yaml. Decode the references and collapse
+    whitespace here so the DB — and therefore the site — always shows the real
+    text ("Flyin' Ryan Invitational"). No-op for already-clean names.
+    """
+    if not value:
+        return value
+    return re.sub(r'\s+', ' ', html.unescape(str(value))).strip()
 
 @dataclass
 class RaceConfig:
@@ -213,7 +228,7 @@ class MileSplitScraper:
 
             for race in meet_entry.get('races', []):
                 rc = RaceConfig(
-                    meet_name=meet_entry['name'],
+                    meet_name=clean_meet_name(meet_entry['name']),
                     race_name=race['name'],
                     distance=race['distance'],
                     race_class=race.get('class', 'varsity'),
