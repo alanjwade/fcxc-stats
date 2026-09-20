@@ -973,6 +973,42 @@ meets:
         distance: "5K"
         class: "varsity"
         gender: "boys"
+  # ===========================================================================
+  # Loveland Sweetheart Invitational 2026
+  # Source: 1 HTML file (girls_division_1_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Loveland Sweetheart Invitational 2026"
+    date: "2026-09-18"
+    venue: "North Lake Park, Loveland CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/loveland_sweetheart_invitational/girls_division_1_5k.html"
+    races:
+      - name: "Division 1 Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Loveland Sweetheart Invitational 2026
+  # Source: 1 HTML file (boys_division_1_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Loveland Sweetheart Invitational 2026"
+    date: "2026-09-18"
+    venue: "North Lake Park, Loveland CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/loveland_sweetheart_invitational/boys_division_1_5k.html"
+    races:
+      - name: "Division 1 Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+
+
 
 
 
@@ -1010,6 +1046,8 @@ team:
   colors:
     primary: "#FF0000"
     secondary: "#FFFFFF"
+
+
 
 
 
