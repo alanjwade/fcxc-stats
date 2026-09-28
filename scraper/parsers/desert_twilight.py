@@ -15,6 +15,15 @@ class DesertTwilightParser(BaseParser):
     parser_name = "desert_twilight"
 
     def can_parse(self, content: str) -> bool:
+        # This parser handles the plain-text (Athletic.net) Desert Twilight
+        # layout. A MileSplit "formatted" page for the same meet also contains
+        # the words "Desert Twilight" (title, and every embedded performance
+        # row's meetName), so exclude those: they are parsed from the embedded
+        # payload by MilesplitApiParser instead. Without this guard the bare
+        # substring match won the auto-detect and dispatched to the plain-text
+        # algorithm, which found no results_title and extracted nothing.
+        if "milesplit-api-data" in content:
+            return False
         return "Desert Twilight" in content
 
     def extract_races(self, content: str) -> Dict[str, List[ParsedResult]]:

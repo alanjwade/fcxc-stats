@@ -12,6 +12,15 @@ from .base import BaseParser, ParsedResult, ParserRegistry
 # Order matters: more-specific parsers must be imported (and therefore tried)
 # before generic ones. DefaultParser is intentionally last since it is the
 # broadest fallback.
+#
+# milesplit_api comes first because its marker is unambiguous: an embedded,
+# machine-generated <script id="milesplit-api-data"> payload is the race's
+# actual results, so its presence alone decides the parser. It must precede the
+# meet-name-substring parsers (e.g. desert_twilight, whose can_parse() is just
+# `"Desert Twilight" in content` — true for every Desert Twilight page,
+# including MileSplit "formatted" ones). Otherwise those win the first-match
+# auto-detect and dispatch to a plain-text algorithm that extracts nothing.
+from . import milesplit_api
 from . import john_martin
 from . import thornton_combined
 from . import raw_windsor_combined
@@ -21,7 +30,6 @@ from . import regionals_table
 from . import longs_peak
 from . import loveland_sweetheart
 from . import raw_combined
-from . import milesplit_api
 from . import default_parser
 
 

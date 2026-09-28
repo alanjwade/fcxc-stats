@@ -1007,6 +1007,42 @@ meets:
         distance: "5K"
         class: "varsity"
         gender: "boys"
+  # ===========================================================================
+  # Desert Twilight XC Festival 2026
+  # Source: 1 HTML file (boys_varsity.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Desert Twilight XC Festival 2026"
+    date: "2026-09-25"
+    venue: "Coyote Run Golf Course@Leisure World, Mesa AZ"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/desert_twilight_xc_festival/boys_varsity.html"
+    races:
+      - name: "Varsity Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+  # ===========================================================================
+  # Desert Twilight XC Festival 2026
+  # Source: 1 HTML file (girls_varsity.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Desert Twilight XC Festival 2026"
+    date: "2026-09-25"
+    venue: "Coyote Run Golf Course@Leisure World, Mesa AZ"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/desert_twilight_xc_festival/girls_varsity.html"
+    races:
+      - name: "Varsity Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+
+
 
 
 
@@ -1046,6 +1082,8 @@ team:
   colors:
     primary: "#FF0000"
     secondary: "#FFFFFF"
+
+
 
 
 
