@@ -133,6 +133,7 @@ meets:
       - name: "Boys Freshman/Sophomore"
         distance: "2M"
         class: "freshman"
+        gender: "boys"
 # ===========================================================================
   # John Martin XC Invitational 2025 — August 30, 2025
   # Source: 4 separate HTML files, one per race
@@ -189,7 +190,6 @@ meets:
         distance: "5K"
         class: "jv"
         gender: "girls"
-        gender: "boys"
 
   - name: "Vista Nation XC 2-Mile Invitational 2025"
     date: "2025-08-23"
@@ -202,6 +202,7 @@ meets:
       - name: "Girls Freshman/Sophomore"
         distance: "2M"
         class: "freshman"
+        gender: "girls"
 # ===========================================================================
   # Thornton Cross Country Invitational 2025 — September 5, 2025
   # Source: 1 combined HTML file containing 4 races in <pre> text
