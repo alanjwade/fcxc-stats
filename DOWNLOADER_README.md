@@ -95,6 +95,13 @@ Use `--yes` to skip the confirmation prompt (for scripting). The script saves
 the page to `sources/pages/{season}/{slug}/{file}.html` and inserts a formatted
 entry into `meets.yaml` before the `team:` block, preserving the file's layout.
 
+The entry is only appended when that race isn't already declared — re-running
+the downloader for the same race used to add another identical entry every time
+(the John Martin XC Invitational 2026 "Varsity Girls" entry had accumulated
+five). And the gender is never guessed: if it can't be determined from the URL
+or the page, the run stops and asks for `--gender` instead of writing a `mixed`
+(or otherwise wrong) value.
+
 ### Results are embedded for "formatted" pages
 
 MileSplit "formatted" results pages render their rows purely from the
@@ -137,6 +144,38 @@ validation runs automatically inside `run_scraper` — when a parser's output
 fails a criterion you'll see a `WARNING: ... fail validation` in the log instead
 of silent garbage results.
 
+## meets.yaml validation (`validate_meets`)
+
+Every entry in `sources/meets.yaml` is validated before anything is scraped.
+`validate_meets` reports all problems at once, and `run_scraper` runs it
+automatically and refuses to touch the database if anything is wrong.
+
+```bash
+cd scraper
+./validate_meets                        # defaults to ../sources/meets.yaml
+./validate_meets ../sources/meets.yaml  # explicit path
+# [OK]  /path/sources/meets.yaml: 52 meet entries, 71 race entries - no problems.
+```
+
+Exit code `0` when the file is clean, `1` otherwise. It flags:
+
+- **a duplicated mapping key** — plain YAML keeps the last value, so
+  `gender: "girls"` followed by `gender: "boys"` silently published a girls
+  race as boys;
+- **a missing or unknown `gender`/`class`** — a missing gender used to be
+  defaulted to boys by the scraper, and a missing class to `varsity`;
+- **`gender: "mixed"`** — this can never be stored: the `athletes` table only
+  accepts `male`/`female`, so the race is dropped at insert time;
+- **a name that contradicts the gender** — e.g. a race named "Varsity Girls"
+  declared `gender: "boys"`;
+- **a duplicate entry** — the same race, from the same source, declared twice;
+- **a missing source, or a `source.path` that isn't on disk**.
+
+One race fed by several *different* files is fine: a division split across
+result pages is one race row fed by several files (Liberty Bell 2026's
+"Division 1 Boys" is five page files whose results sum to that one race). Only
+a whole-entry repeat from the same source is reported.
+
 ## Running the scraper (after adding to meets.yaml)
 
 `scraper/run_scraper.sh` wraps `scraper/scraper.py` and handles the Python
@@ -155,3 +194,8 @@ package is importable), and defaults `DATABASE_URL` to the repo-local
 point at a different sources file with `--sources <path>` (or
 `FCXC_SOURCES=<path>`). Passing `--sources`/`--config` yourself disables the
 default.
+
+Before scraping it validates the sources file (see above) and stops without
+touching the database if there is a problem. Bypass that with
+`--skip-validate`; the flag is not passed on to `scraper.py`, and the
+in-scraper check still applies.

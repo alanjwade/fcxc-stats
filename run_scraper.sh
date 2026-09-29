@@ -73,8 +73,48 @@ if [ -z "$HAVE_SOURCE_FLAG" ]; then
 fi
 args+=("$@")
 
+# --- validate the sources file before touching the database -------------------
+# A bad entry used to be silently mis-filed (a missing `gender:` was defaulted
+# to boys) or dropped at insert time (a `mixed` race). validate_meets.py fails
+# loudly instead. Skipped for the legacy --config format, and skippable with
+# --skip-validate (which is not forwarded on to scraper.py).
+VALIDATE_TARGET=""
+USE_LEGACY_CONFIG=""
+SKIP_VALIDATE=""
+prev=""
+for arg in "$@"; do
+    case "$prev" in
+        --sources) VALIDATE_TARGET="$arg" ;;
+        --config)  USE_LEGACY_CONFIG="1" ;;
+    esac
+    case "$arg" in
+        --sources=*)     VALIDATE_TARGET="${arg#*=}" ;;
+        --config=*)      USE_LEGACY_CONFIG="1" ;;
+        --skip-validate) SKIP_VALIDATE="1" ;;
+    esac
+    prev="$arg"
+done
+[ -n "$VALIDATE_TARGET" ] || VALIDATE_TARGET="$FCXC_SOURCES"
+
+if [ -z "$SKIP_VALIDATE" ] && [ -z "$USE_LEGACY_CONFIG" ]; then
+    echo "Validating ${VALIDATE_TARGET} ..." >&2
+    if ! "$VENV_PYTHON" "${SCRAPER_DIR}/validate_meets.py" "$VALIDATE_TARGET" >&2; then
+        echo "Refusing to scrape: fix the problems above (or re-run with --skip-validate)." >&2
+        exit 1
+    fi
+fi
+
 # --- run the scraper from the scraper dir so `parsers` is importable ----------
 cd "$SCRAPER_DIR"
+
+# Drop our own --skip-validate flag before handing the rest to scraper.py.
+scraper_args=()
+for arg in "${args[@]}"; do
+    if [ "$arg" != "--skip-validate" ]; then
+        scraper_args+=("$arg")
+    fi
+done
+
 echo "Using DATABASE_URL: ${DATABASE_URL}" >&2
-echo "Running: ${VENV_PYTHON} scraper.py ${args[*]}" >&2
-exec "$VENV_PYTHON" "scraper.py" "${args[@]}"
+echo "Running: ${VENV_PYTHON} scraper.py ${scraper_args[*]}" >&2
+exec "$VENV_PYTHON" "scraper.py" "${scraper_args[@]}"

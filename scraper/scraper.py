@@ -22,6 +22,8 @@ from sqlalchemy import create_engine, text
 from dataclasses import dataclass
 import uuid
 
+import meets_config
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -209,13 +211,15 @@ class MileSplitScraper:
         Load race configuration from the new canonical sources format
         (sources/meets.yaml). Each meet entry with a file source gets
         expanded into per-race RaceConfig entries.
+
+        The file is validated first (see meets_config.py) and a bad entry is an
+        error, never silently defaulted: `gender` used to fall back to 'boys'
+        and `class` to 'varsity' here, which is how two 2025 girls races ended
+        up published as boys races. Raises ValueError listing every problem.
         """
-        try:
-            with open(sources_path, 'r') as f:
-                config = yaml.safe_load(f)
-        except Exception as e:
-            logger.error(f"Error loading sources config {sources_path}: {e}")
-            return []
+        config, problems = meets_config.validate_file(sources_path)
+        if problems:
+            raise ValueError(meets_config.format_problems(problems, sources_path))
 
         sources_dir = os.path.dirname(os.path.abspath(sources_path))
         race_configs = []
@@ -231,8 +235,8 @@ class MileSplitScraper:
                     meet_name=clean_meet_name(meet_entry['name']),
                     race_name=race['name'],
                     distance=race['distance'],
-                    race_class=race.get('class', 'varsity'),
-                    gender=race.get('gender', 'boys'),
+                    race_class=race['class'],
+                    gender=race['gender'],
                     venue=meet_entry.get('venue', ''),
                     date=meet_entry.get('date', ''),
                     season=meet_entry.get('season', ''),
@@ -2745,7 +2749,14 @@ def main():
                 sys.exit(1)
         
         logger.info(f"Loading sources config from: {sources_path}")
-        race_configs = scraper.load_sources_config(sources_path)
+        try:
+            race_configs = scraper.load_sources_config(sources_path)
+        except ValueError as exc:
+            # Every problem in the file is listed; nothing is guessed at.
+            logger.error(str(exc))
+            logger.error("Fix the file above, or check it with: "
+                         "scraper/validate_meets")
+            sys.exit(1)
     else:
         # Old-format config
         config_path = args.config

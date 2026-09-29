@@ -71,6 +71,14 @@ compatibility.
 
 ## Notes
 
+- `run_scraper` validates `sources/meets.yaml` before touching the database
+  (`scraper/validate_meets.py`; same rules as `scraper/meets_config.py`). A
+  duplicated key, a missing/unknown `gender` or `class`, a `mixed` gender, a
+  name that contradicts its gender, a duplicate entry or a missing source file
+  stops the run — nothing is defaulted any more. Check a file on its own with
+  `scraper/validate_meets`. `--skip-validate` skips the pre-flight only.
+- `download_and_add` never guesses a gender (it stops and asks for `--gender`)
+  and never appends a second copy of a race it already finds in `meets.yaml`.
 - The downloader has both new (named `--season/--meet/--name`) and legacy
   positional (`download_page.py "<url>" "<output.html>"`) arguments.
 - After ingesting new data locally, the SQLite file can be copied to the server

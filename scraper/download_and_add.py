@@ -36,6 +36,8 @@ from bs4 import BeautifulSoup
 
 from download_page import download_html, fetch_milesplit_api, embed_api_results
 
+import meets_config
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCES_DIR = os.path.join(PROJECT_ROOT, "sources")
 MEETS_YAML = os.path.join(SOURCES_DIR, "meets.yaml")
@@ -144,12 +146,21 @@ def class_from_bucket(bucket):
 
 
 def gender_from_api_name(name):
+    """Map a MileSplit genderName to our value, or None if it is not a
+    single-gender label.
+
+    A "Mixed" (or missing) division used to come back as "mixed", which can
+    never be stored: map_gender_for_db('mixed') violates the athletes table's
+    CHECK (gender IN ('male','female')), so the entire race was dropped at
+    insert time. Returning None surfaces it as a field the caller has to fix
+    with --gender.
+    """
     g = (name or "").strip().lower()
     if g in ("boys", "men", "male"):
         return "boys"
     if g in ("girls", "women", "female"):
         return "girls"
-    return "mixed"
+    return None
 
 
 def build_race_url(base_url, event_param=None, gender_param=None, division_param=None):
@@ -333,16 +344,19 @@ def infer_metadata(url, html, args):
     cls = args.race_class or class_from_division(q["division"]) or class_from_text(ld, og)
     gender = args.gender or gender_from_param(q["gender"]) or gender_from_text(ld, og)
     cls = cls or "varsity"
-    gender = gender or "mixed"
     distance = distance or "5K"
+    # `gender` is deliberately NOT defaulted. A "mixed" race can never be stored
+    # (the athletes table only accepts male/female) and a wrong guess misfiles
+    # the whole race, so an un-inferable gender is reported as a missing field
+    # by validate() -- with the --gender flag to fix it -- instead of guessed at.
 
+    gender_word = GENDER_DISPLAY.get(gender) or (gender.title() if gender else "")
     if args.race_name:
         race_name = args.race_name
     elif args.race_class and args.gender:
-        race_name = f"{CLASS_DISPLAY.get(cls, cls.title())} {GENDER_DISPLAY.get(gender, gender.title())}".strip()
+        race_name = f"{CLASS_DISPLAY.get(cls, cls.title())} {gender_word}".strip()
     else:
         class_word = CLASS_DISPLAY.get(cls) or cls.title()
-        gender_word = GENDER_DISPLAY.get(gender) or gender.title()
         race_name = f"{class_word} {gender_word}".strip()
 
     return {
@@ -457,8 +471,8 @@ def print_override_help():
         "  --season    season/year\n"
         "  --venue     venue\n"
         "  --distance  distance (e.g. 5K, 1600m)\n"
-        "  --class     class (varsity, jv, freshman, open)\n"
-        "  --gender    gender (boys, girls, mixed)\n"
+        "  --class     class (varsity, jv, freshman)\n"
+        "  --gender    gender (boys, girls - a mixed race cannot be stored)\n"
         "  --race-name race display name\n"
         "  --dir       source folder slug\n"
         "  --name     file stem (no extension)\n"
@@ -477,7 +491,24 @@ def write_page(html, season, dir_slug, filename):
 
 
 def build_yaml_entry(meta, rel_path):
-    """Build the formatted meets.yaml entry text for the new meet."""
+    """Build the formatted meets.yaml entry text for the new meet.
+
+    Refuses to write an entry the scraper would reject, or one whose results
+    would be dropped: `gender` and `class` must be values meets_config allows.
+    """
+    gender = meta.get("gender")
+    if gender not in meets_config.ALLOWED_GENDERS:
+        raise ValueError(
+            "refusing to write a meets.yaml entry with gender %r: expected one "
+            "of %s (a 'mixed' or undetected gender cannot be stored - the "
+            "athletes table only accepts male/female)"
+            % (gender, ", ".join(meets_config.ALLOWED_GENDERS)))
+    race_class = meta.get("class")
+    if race_class not in meets_config.ALLOWED_CLASSES:
+        raise ValueError(
+            "refusing to write a meets.yaml entry with class %r: expected one "
+            "of %s" % (race_class, ", ".join(meets_config.ALLOWED_CLASSES)))
+
     name = meta["meet_name"]
     date = meta["date"]
     season = meta["season"]
@@ -542,6 +573,50 @@ def insert_into_meets_yaml(meets_path, entry_text):
     return meets_path
 
 
+def race_key_from_meta(meta):
+    """The identity a race entry must not repeat: meet, date, race name,
+    distance, class and gender -- the same fields the scraper uses to identify a
+    race row."""
+    return (str(meta.get("meet_name") or ""), str(meta.get("date") or ""),
+            str(meta.get("race_name") or ""), str(meta.get("distance") or ""),
+            str(meta.get("class") or ""), str(meta.get("gender") or ""))
+
+
+def existing_race_keys(meets_path):
+    """Identity of every race already declared in meets_path.
+
+    Reads via meets_config.load_sources so a file with a duplicate key is
+    reported rather than quietly appended to.
+    """
+    if not os.path.exists(meets_path):
+        return set()
+    config = meets_config.load_sources(meets_path)
+    keys = set()
+    for meet in (config or {}).get("meets") or []:
+        for race in meet.get("races") or []:
+            keys.add((str(meet.get("name") or ""), str(meet.get("date") or ""),
+                      str(race.get("name") or ""), str(race.get("distance") or ""),
+                      str(race.get("class") or ""), str(race.get("gender") or "")))
+    return keys
+
+
+def append_entry_unless_present(meets_path, meta, entry):
+    """Append `entry` to meets.yaml unless this race is already declared.
+
+    insert_into_meets_yaml() appends unconditionally, so every re-run of the
+    downloader for the same race used to add another identical entry -- the John
+    Martin XC Invitational 2026 "Varsity Girls" entry had accumulated five.
+    Returns True when the entry was written.
+    """
+    if race_key_from_meta(meta) in existing_race_keys(meets_path):
+        print("note: %s / %s is already declared in %s - leaving the entry out."
+              % (meta.get("meet_name"), meta.get("race_name"),
+                 os.path.basename(meets_path)))
+        return False
+    insert_into_meets_yaml(meets_path, entry)
+    return True
+
+
 def default_filename(meta):
     cls = meta["class"]
     gender = meta["gender"]
@@ -553,11 +628,22 @@ def default_filename(meta):
 
 
 def validate(meta):
-    missing = [k for k in ("meet_name", "date", "season") if not meta.get(k)]
+    """Return the fields that are missing or invalid, as printable strings."""
+    bad = [k for k in ("meet_name", "date", "season") if not meta.get(k)]
     for k in ("class", "gender", "distance"):
         if not meta.get(k):
-            missing.append(k)
-    return missing
+            bad.append(k)
+
+    gender = meta.get("gender")
+    if gender and gender not in meets_config.ALLOWED_GENDERS:
+        bad.append("gender (=%s; must be one of %s - a mixed race cannot be "
+                   "stored)" % (gender, ", ".join(meets_config.ALLOWED_GENDERS)))
+
+    race_class = meta.get("class")
+    if race_class and race_class not in meets_config.ALLOWED_CLASSES:
+        bad.append("class (=%s; must be one of %s)"
+                   % (race_class, ", ".join(meets_config.ALLOWED_CLASSES)))
+    return bad
 
 
 def is_meet_level_formatted_url(url):
@@ -577,7 +663,8 @@ def build_meta_for_group(base_meta, group):
     race_class = class_from_bucket(bucket)
     distance = distance_from_meters(group.get("event_distance")) or "5K"
     race_prefix = group.get("division_display") or ("JV" if bucket == "jv" else "Division 1")
-    race_name = f"{race_prefix} {GENDER_DISPLAY.get(gender, gender.title())}".strip()
+    gender_word = GENDER_DISPLAY.get(gender) or (gender.title() if gender else "")
+    race_name = f"{race_prefix} {gender_word}".strip()
 
     meta = dict(base_meta)
     meta.update(
@@ -601,7 +688,7 @@ def apply_group_filters(groups, base_meta, args):
         nd = normalize_distance_filter(d)
         if nd:
             distance_set.add(nd)
-    gender_set = {g for g in gender_filters if g in ("boys", "girls", "mixed")}
+    gender_set = {g for g in gender_filters if g in meets_config.ALLOWED_GENDERS}
 
     if not distance_set and not gender_set:
         return groups
@@ -650,7 +737,7 @@ def process_single_url(url, args):
 
     missing = validate(meta)
     if missing:
-        print("\nThese required fields are missing or could not be inferred:")
+        print("\nThese required fields are missing or invalid:")
         for f in missing:
             print(f"   - {f}")
         print_override_help()
@@ -670,16 +757,21 @@ def process_single_url(url, args):
         print()
         print("DRY RUN: no files written and meets.yaml unchanged.")
         print(f"Would save page: {page_path}")
-        print("Would add meets.yaml entry:")
-        print(entry)
+        if race_key_from_meta(meta) in existing_race_keys(args.meets_yaml):
+            print("Would NOT add a meets.yaml entry - this race is already "
+                  "declared (see validate_meets.py).")
+        else:
+            print("Would add meets.yaml entry:")
+            print(entry)
         return 0
 
-    insert_into_meets_yaml(args.meets_yaml, entry)
+    added = append_entry_unless_present(args.meets_yaml, meta, entry)
 
     print()
     print(f"✓ Page saved: {page_path}")
-    print("✓ meets.yaml entry added:")
-    print(entry)
+    if added:
+        print("✓ meets.yaml entry added:")
+        print(entry)
     print("Next: run `python scraper/scraper.py --sources sources/meets.yaml`")
     return 0
 
@@ -732,9 +824,19 @@ def process_meet_level_url(url, args):
     season = base_meta["season"] or "unknown"
     dir_slug = args.dir or slugify(base_meta["meet_name"])
     written = []
+    skipped = []
     used_filenames = set()
 
     for group in groups:
+        meta = build_meta_for_group(base_meta, group)
+        problems = validate(meta)
+        if problems:
+            # Refuse rather than write an entry the scraper cannot store (e.g. a
+            # mixed division, whose race would be dropped at insert time).
+            skipped.append((meta.get("race_name") or group.get("division_name") or "?",
+                            problems))
+            continue
+
         event_param = EVENT_PARAM_BY_DISTANCE.get(group.get("event_distance"))
         gender_name = group.get("gender_name")
         division_name = group.get("division_name")
@@ -744,7 +846,6 @@ def process_meet_level_url(url, args):
         filtered = filter_api_for_url(api_data, race_url)
         race_html = embed_api_results(race_html, {"data": filtered.get("data", [])})
 
-        meta = build_meta_for_group(base_meta, group)
         filename = default_filename_for_group(meta, group)
         if filename in used_filenames:
             stem = filename[:-5] if filename.endswith(".html") else filename
@@ -759,12 +860,16 @@ def process_meet_level_url(url, args):
         rel_path = os.path.relpath(page_path, SOURCES_DIR)
 
         entry = build_yaml_entry(meta, rel_path)
-        insert_into_meets_yaml(args.meets_yaml, entry)
-        written.append((page_path, entry))
+        if append_entry_unless_present(args.meets_yaml, meta, entry):
+            written.append((page_path, entry))
 
     print()
     print(f"✓ Saved {len(written)} race page files under pages/{season}/{dir_slug}/")
     print(f"✓ Added {len(written)} entries to {args.meets_yaml}")
+    if skipped:
+        print(f"! Skipped {len(skipped)} race(s) that could not be validated:")
+        for label, problems in skipped:
+            print(f"    {label}: " + "; ".join(problems))
     print("Next: run `python scraper/scraper.py --sources sources/meets.yaml`")
     return 0
 
@@ -790,8 +895,8 @@ def main(argv=None):
     parser.add_argument("--season", help="Season/year (overrides inferred)")
     parser.add_argument("--venue", help="Venue (overrides inferred)")
     parser.add_argument("--distance", help="Distance e.g. 5K, 1600m")
-    parser.add_argument("--class", dest="race_class", help="class: varsity, jv, freshman, open")
-    parser.add_argument("--gender", help="gender: boys, girls, mixed")
+    parser.add_argument("--class", dest="race_class", help="class: varsity, jv, freshman")
+    parser.add_argument("--gender", help="gender: boys, girls (a mixed race cannot be stored)")
     parser.add_argument("--race-name", help="Race display name e.g. 'Varsity Girls'")
     parser.add_argument("--name", help="Output file stem (no extension)")
     parser.add_argument("--dir", help="Source folder slug (meet slug)")
@@ -800,7 +905,7 @@ def main(argv=None):
                         help="Preview what would be downloaded/added without writing files")
     parser.add_argument("--filter-distance", action="append", default=[],
                         help="Meet-level only: include only this distance (e.g. 5K). Can repeat.")
-    parser.add_argument("--filter-gender", action="append", default=[], choices=["boys", "girls", "mixed"],
+    parser.add_argument("--filter-gender", action="append", default=[], choices=list(meets_config.ALLOWED_GENDERS),
                         help="Meet-level only: include only this gender. Can repeat.")
     parser.add_argument("--yes", action="store_true", help="Skip the confirmation prompt")
     parser.add_argument("--meets-yaml", default=MEETS_YAML,
