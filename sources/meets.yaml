@@ -974,6 +974,222 @@ meets:
         distance: "5K"
         class: "varsity"
         gender: "girls"
+  # ===========================================================================
+  # Mead Stampede 2026
+  # Source: 1 HTML file (girls_division_1_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Mead Stampede 2026"
+    date: "2026-10-03"
+    venue: "Mead High School XC Course, Longmont CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/mead_stampede/girls_division_1_5k.html"
+    races:
+      - name: "Division 1 Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Mead Stampede 2026
+  # Source: 1 HTML file (boys_division_1_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Mead Stampede 2026"
+    date: "2026-10-03"
+    venue: "Mead High School XC Course, Longmont CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/mead_stampede/boys_division_1_5k.html"
+    races:
+      - name: "Division 1 Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+  # ===========================================================================
+  # Mead Stampede 2026
+  # Source: 1 HTML file (girls_division_1_5k_2.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Mead Stampede 2026"
+    date: "2026-10-03"
+    venue: "Mead High School XC Course, Longmont CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/mead_stampede/girls_division_1_5k_2.html"
+    races:
+      - name: "Division 1 Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Mead Stampede 2026
+  # Source: 1 HTML file (girls_jv_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Mead Stampede 2026"
+    date: "2026-10-03"
+    venue: "Mead High School XC Course, Longmont CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/mead_stampede/girls_jv_5k.html"
+    races:
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+  # ===========================================================================
+  # Mead Stampede 2026
+  # Source: 1 HTML file (boys_division_1_5k_2.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Mead Stampede 2026"
+    date: "2026-10-03"
+    venue: "Mead High School XC Course, Longmont CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/mead_stampede/boys_division_1_5k_2.html"
+    races:
+      - name: "Division 1 Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+  # ===========================================================================
+  # Mead Stampede 2026
+  # Source: 1 HTML file (boys_jv_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Mead Stampede 2026"
+    date: "2026-10-03"
+    venue: "Mead High School XC Course, Longmont CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/mead_stampede/boys_jv_5k.html"
+    races:
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+  # ===========================================================================
+  # Front Range League Championships 2026
+  # Source: 1 HTML file (girls_division_1_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Front Range League Championships 2026"
+    date: "2026-10-09"
+    venue: "Margaret Carpenter Recreation Center, Thornton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/front_range_league_championships/girls_division_1_5k.html"
+    races:
+      - name: "Division 1 Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Front Range League Championships 2026
+  # Source: 1 HTML file (girls_jv_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Front Range League Championships 2026"
+    date: "2026-10-09"
+    venue: "Margaret Carpenter Recreation Center, Thornton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/front_range_league_championships/girls_jv_5k.html"
+    races:
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+  # ===========================================================================
+  # Front Range League Championships 2026
+  # Source: 1 HTML file (boys_division_1_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Front Range League Championships 2026"
+    date: "2026-10-09"
+    venue: "Margaret Carpenter Recreation Center, Thornton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/front_range_league_championships/boys_division_1_5k.html"
+    races:
+      - name: "Division 1 Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+  # ===========================================================================
+  # Front Range League Championships 2026
+  # Source: 1 HTML file (boys_jv_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Front Range League Championships 2026"
+    date: "2026-10-09"
+    venue: "Margaret Carpenter Recreation Center, Thornton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/front_range_league_championships/boys_jv_5k.html"
+    races:
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+  # ===========================================================================
+  # Hawk JV Championships 2026
+  # Source: 1 HTML file (girls_jv_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Hawk JV Championships 2026"
+    date: "2026-10-16"
+    venue: "Margaret Carpenter Recreation Center, Thornton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/hawk_jv_championships/girls_jv_5k.html"
+    races:
+      - name: "JV Girls"
+        distance: "5K"
+        class: "jv"
+        gender: "girls"
+  # ===========================================================================
+  # Hawk JV Championships 2026
+  # Source: 1 HTML file (boys_jv_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Hawk JV Championships 2026"
+    date: "2026-10-16"
+    venue: "Margaret Carpenter Recreation Center, Thornton CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/hawk_jv_championships/boys_jv_5k.html"
+    races:
+      - name: "JV Boys"
+        distance: "5K"
+        class: "jv"
+        gender: "boys"
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1015,6 +1231,18 @@ team:
   colors:
     primary: "#FF0000"
     secondary: "#FFFFFF"
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
