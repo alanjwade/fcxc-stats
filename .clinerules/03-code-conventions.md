@@ -2,10 +2,10 @@
 
 ## Python / environment
 
-- Python **3.11** (the image is `python:3.11-slim`).
+- Python **3.13** (the image is `python:3.13-slim`).
 - **Pin all dependencies with `==`** in `webapp/requirements.txt` and
   `scraper/requirements.txt`. Do not use unpinned ranges.
-- Webapp runtime deps: `flask==3.1.0`, `sqlalchemy==2.0.36`. Scraper adds
+- Webapp runtime deps: `flask==3.1.3`, `sqlalchemy==2.1.6`. Scraper adds
   `requests`, `beautifulsoup4`, `lxml`, `pyyaml`, `playwright`.
 - Type hints are used throughout (`from typing import ...`); keep that style.
 
