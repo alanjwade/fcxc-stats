@@ -59,6 +59,7 @@ def main(argv=None):
 
     winners = []
     details = []
+    empties = []
     for parser_cls, parser in get_parsers():
         try:
             if not parser.can_parse(content):
@@ -67,6 +68,7 @@ def main(argv=None):
         except Exception as e:
             continue
         if not sections:
+            empties.append(parser_cls.__name__)
             continue
         flat = [r for lst in sections.values() for r in lst]
         report = validate_parsed_results(flat, team_names=team_names, distance=args.distance)
@@ -88,11 +90,18 @@ def main(argv=None):
     if winners:
         w = winners[0]
         print(f"[OK]   {w['parser']} parses it properly: {w['results']} results.")
+    elif empties:
+        # The format was recognised (can_parse matched) but extraction produced
+        # nothing -- this is a parser gap, not a validation failure.
+        print(f"[none] Parser(s) matched but extracted no results: "
+              f"{', '.join(empties)}.")
     else:
         print("[none] No registered parser parsed this file correctly.")
 
     if args.json:
-        print(json.dumps({"winners": winners, "all": details}, indent=2))
+        print(json.dumps({"winners": winners,
+                          "matched_but_empty": empties,
+                          "all": details}, indent=2))
 
     return 0 if winners else 1
 
