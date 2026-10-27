@@ -1178,6 +1178,42 @@ meets:
         distance: "5K"
         class: "jv"
         gender: "boys"
+  # ===========================================================================
+  # Colorado 5A Region 4 2026
+  # Source: 1 HTML file (girls_division_1_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Colorado 5A Region 4 2026"
+    date: "2026-10-22"
+    venue: "Spring Canyon Park, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/colorado_5a_region_4/girls_division_1_5k.html"
+    races:
+      - name: "Division 1 Girls"
+        distance: "5K"
+        class: "varsity"
+        gender: "girls"
+  # ===========================================================================
+  # Colorado 5A Region 4 2026
+  # Source: 1 HTML file (boys_division_1_5k.html)
+  # Parser: auto (auto-detected)
+  # ===========================================================================
+  - name: "Colorado 5A Region 4 2026"
+    date: "2026-10-22"
+    venue: "Spring Canyon Park, Fort Collins CO"
+    season: "2026"
+    source:
+      type: file
+      path: "pages/2026/colorado_5a_region_4/boys_division_1_5k.html"
+    races:
+      - name: "Division 1 Boys"
+        distance: "5K"
+        class: "varsity"
+        gender: "boys"
+
+
 
 
 
@@ -1231,6 +1267,8 @@ team:
   colors:
     primary: "#FF0000"
     secondary: "#FFFFFF"
+
+
 
 
 
