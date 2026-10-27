@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
-Cross Country Statistics We    # Exclude localhost/development IPs
-    if client_ip in EXCLUDED_IPS:
-        return Falsepplication
+Cross Country Statistics Web Application
 
 Flask web application that provides:
 1. CSV export of athlete performance data
